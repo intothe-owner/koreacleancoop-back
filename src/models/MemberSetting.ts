@@ -28,6 +28,10 @@ MemberSetting.init({
   },
   approvalNotice: { type: DataTypes.TEXT, comment: '가입 페이지에 표시할 승인 안내 및 서류 제출 가이드 텍스트' },
 
+  // --- 💡 [신규 추가] 약관 동의 설정 ---
+  useTermsOfService: { type: DataTypes.BOOLEAN, defaultValue: true, comment: '가입 시 이용약관 동의 노출 여부' },
+  usePrivacyPolicy: { type: DataTypes.BOOLEAN, defaultValue: true, comment: '가입 시 개인정보처리방침 동의 노출 여부' },
+
   // 회원 권한 설정 (0 ~ 10 레벨)
   defaultLevel: { type: DataTypes.INTEGER, defaultValue: 1, comment: '신규 가입 회원 기본 권한 레벨' },
   levelNames: { type: DataTypes.JSON, comment: '권한 레벨(0~10)별 명칭 관리 (JSON 형태)' },
@@ -47,5 +51,5 @@ MemberSetting.init({
 }, { 
   sequelize, 
   tableName: 'member_settings',
-  comment: '회원가입 항목, 승인 제도, 0~10 권한 및 SNS 로그인 설정 테이블'
+  comment: '회원가입 항목, 승인 제도, 0~10 권한, SNS 로그인 및 약관 설정 테이블'
 });

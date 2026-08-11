@@ -12,7 +12,6 @@ import aiRoutes from './routes/aiRoutes';
 import boardRoutes from './routes/boardRoutes';
 import authRoutes from './routes/authRoutes';
 import popupRoutes from './routes/popupRoutes';
-import supportFundRoutes from './routes/supportFundRoutes';
 import visitorRoutes from './routes/visitorRoutes';
 import memberRoutes from './routes/memberRoutes';
 import path from 'path';
@@ -27,11 +26,12 @@ const corsOptions: cors.CorsOptions = {
   origin: [
     "http://localhost:3000",
     "http://113.131.151.103:3000",
-    "http://113.131.151.103:8088",
-    "http://www.syconsulting.co.kr",
-    "http://syconsulting.co.kr",
-    "https://www.syconsulting.co.kr",
-    "https://syconsulting.co.kr",
+    "http://korea.pickitapp.co.kr"
+    // "http://113.131.151.103:8088",
+    // "http://www.syconsulting.co.kr",
+    // "http://syconsulting.co.kr",
+    // "https://www.syconsulting.co.kr",
+    // "https://syconsulting.co.kr",
   ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
@@ -43,7 +43,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // 💡 3. 정적 파일 제공 (CORS와 Body 파싱이 적용된 후 실행)
-app.use('/uploads', express.static(path.join(process.cwd(), 'public/uploads')));
+app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
 
 // 4. API 라우터 연결
 app.use('/api/settings', settingRoutes);
@@ -55,7 +55,6 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/boards', boardRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/popups', popupRoutes);
-app.use('/api/funds', supportFundRoutes);
 app.use('/api/visitors', visitorRoutes);
 app.use('/api/members', memberRoutes);
 

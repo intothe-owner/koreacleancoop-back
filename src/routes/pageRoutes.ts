@@ -115,13 +115,15 @@ router.get('/boards/:id', async (req: Request, res: Response) => {
 });
 
 // JSON 데이터와 파일을 매핑해주는 헬퍼 함수
-const processFileData = (files: any, blocks: any[], slides: any[], pageMeta: any) => {
+const processFileData = (req: Request, files: any, blocks: any[], slides: any[], pageMeta: any) => {
   if (files && Array.isArray(files)) {
     files.forEach((file: any) => {
       const fieldName = file.fieldname;
       
-      // 💡 핵심 변경 사항: localhost 주소 대신 S3에서 제공하는 location URL을 바로 사용합니다.
-      const fileUrl = file.location; 
+      // 💡 2. 핵심 변경 사항: S3의 location 대신 로컬 filename을 사용하여 접근 URL 생성
+      // req.protocol (http/https) 와 req.get('host') (도메인:포트) 를 조합합니다.
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const fileUrl = `${baseUrl}/uploads/${file.filename}`;
 
       // 1. 슬라이드 파일인 경우
       if (fieldName.startsWith('slide_file_')) {
@@ -135,7 +137,7 @@ const processFileData = (files: any, blocks: any[], slides: any[], pageMeta: any
           container.columns.forEach((col: any) => {
             col.elements.forEach((el: any) => {
               if (el.id === elId) {
-                el.content = fileUrl; // 업로드된 S3 경로로 치환
+                el.content = fileUrl; // 업로드된 경로로 치환
               }
             });
           });
@@ -151,7 +153,6 @@ const processFileData = (files: any, blocks: any[], slides: any[], pageMeta: any
             container.columns.forEach((col: any) => {
               col.elements.forEach((el: any) => {
                 if (el.id === elId && el.type === 'TABLE' && el.tableData && el.tableData.cells && el.tableData.cells[cellKey]) {
-                  // 임시 blob URL을 실제 S3 서버 URL로 교체
                   el.tableData.cells[cellKey].content = el.tableData.cells[cellKey].content.replace(/src="blob:[^"]+"/, `src="${fileUrl}"`);
                 }
               });
@@ -178,7 +179,7 @@ router.post('/', upload.any(), async (req: Request, res: Response) => {
     let parsedMeta = typeof pageMeta === 'string' ? JSON.parse(pageMeta) : (pageMeta || {});
 
     // 업로드된 파일 매핑 처리
-    processFileData(req.files, parsedBlocks, parsedSlides,parsedMeta);
+    processFileData(req, req.files, parsedBlocks, parsedSlides, parsedMeta);
 
     const newPage = await Page.create({ 
       menuId: menuId ? Number(menuId) : null, 
@@ -206,7 +207,7 @@ router.put('/:id', upload.any(), async (req: Request, res: Response) => {
     let parsedMeta = typeof pageMeta === 'string' ? JSON.parse(pageMeta) : (pageMeta || {});
 
     // 업로드된 파일 매핑 처리
-    processFileData(req.files, parsedBlocks, parsedSlides,parsedMeta);
+    processFileData(req, req.files, parsedBlocks, parsedSlides, parsedMeta);
     
     await Page.update(
       { 

@@ -8,7 +8,8 @@ import { Comment } from './Comment';
 import { MemberSetting } from './MemberSetting';
 import { Member } from './Member';
 import { VisitorLog } from './VisitorLog';
-import { SupportFund } from './SupportFund';
+import { Policy } from './Policy';
+
 
 // --- 테이블 간의 관계(Relation) 정의 ---
 
@@ -36,4 +37,4 @@ Comment.belongsTo(Post, { foreignKey: 'postId' });
 Member.hasMany(Post, { foreignKey: 'memberId' });
 Post.belongsTo(Member, { foreignKey: 'memberId' });
 
-export { Menu, Page, BoardConfig, Post, Comment, SiteSetting, Member,MemberSetting,VisitorLog,SupportFund };
+export { Menu, Page, BoardConfig, Post, Comment, SiteSetting, Member,MemberSetting,VisitorLog,Policy };

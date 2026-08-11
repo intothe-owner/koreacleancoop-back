@@ -28,25 +28,28 @@ router.get('/', async (req: Request, res: Response) => {
 router.put('/', upload.fields([{ name: 'logo', maxCount: 1 }, { name: 'favicon', maxCount: 1 }]), async (req: Request, res: Response) => {
   try {
     const updateData: any = { ...req.body };
-
+    const protocol = req.protocol; // 'http' 또는 'https'
+    const host = req.get('host');    // 'localhost:3000' 또는 'yourdomain.com' 등
+    const baseUrl = `${protocol}://${host}`;
     // 파일이 업로드된 경우 URL 경로 반영
     if (req.files) {
       const files = req.files as { [fieldname: string]: Express.Multer.File[] };
-      
+
       if (files['logo'] && files['logo'][0]) {
-        // 💡 로컬 주소 대신 S3 고유 URL(location)을 저장합니다.
-        updateData.logoUrl = (files['logo'][0] as any).location;
+        // 서버의 도메인(또는 호스트) + 경로를 조합하여 URL을 만듭니다.
+        // 예: /uploads/logo-12345.png
+        updateData.logoUrl = `${baseUrl}/uploads/${files['logo'][0].filename}`;
       }
       if (files['favicon'] && files['favicon'][0]) {
-        // 💡 로컬 주소 대신 S3 고유 URL(location)을 저장합니다.
-        updateData.faviconUrl = (files['favicon'][0] as any).location;
+        updateData.faviconUrl = `${baseUrl}/uploads/${files['favicon'][0].filename}`;
       }
     }
+    console.log(updateData);
 
     await SiteSetting.update(updateData, { where: { id: 1 } });
-    
+
     const updatedSetting = await SiteSetting.findByPk(1);
-    res.status(200).json({ success: true, data: updatedSetting, message: '설정이 저장되었습니다.' });
+    res.status(200).json({ success: true, data: updatedSetting, message: '설정이 저장되었습니다11.' });
   } catch (error) {
     console.error('사이트 설정 수정 오류:', error);
     res.status(500).json({ success: false, message: '서버 오류' });

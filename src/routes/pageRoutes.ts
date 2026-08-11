@@ -66,6 +66,35 @@ router.get('/:id', async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: '서버 오류' });
   }
 });
+router.get('/:id/:secondId', async (req: Request, res: Response) => {
+  try {
+    const { id, secondId } = req.params;
+    
+    // DB의 Menu 테이블에 저장된 url 형태(예: /about/history)로 조합
+    const searchUrl = `/${id}/${secondId}`;
+    console.log("2뎁스 검색 URL:", searchUrl);
+
+    // 1. 해당 URL을 가진 메뉴 검색
+    const menus = await Menu.findAll({ where: { url: searchUrl } });
+    const menuIds = menus.map((m: any) => m.id);
+
+    if (menuIds.length === 0) {
+      return res.status(404).json({ success: false, message: '메뉴를 찾을 수 없습니다.' });
+    }
+
+    // 2. 해당 메뉴 ID와 일치하는 페이지 콘텐츠 조회
+    const page = await Page.findOne({ where: { menuId: menuIds } });
+    
+    if (!page) {
+      return res.status(404).json({ success: false, message: '페이지 콘텐츠를 찾을 수 없습니다.' });
+    }
+    
+    res.status(200).json({ success: true, data: page });
+  } catch (error) {
+    console.error('2뎁스 페이지 조회 오류:', error);
+    res.status(500).json({ success: false, message: '서버 오류' });
+  }
+});
 //게시판
 router.get('/boards/:id', async (req: Request, res: Response) => {
   try {

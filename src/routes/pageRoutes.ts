@@ -1,9 +1,43 @@
 // src/routes/pageRoutes.ts
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { Page,Menu } from '../models';
 import { upload } from '../middlewares/upload'; // multer 미들웨어 임포트
 
 const router = Router();
+
+// 모든 페이지 API 요청의 시작/종료 상태를 기록한다.
+// upload 미들웨어에서 실패해도 요청이 들어왔는지와 최종 상태코드를 알 수 있다.
+router.use((req: Request, res: Response, next: NextFunction) => {
+  const startedAt = Date.now();
+  console.log(`[pages] ${req.method} ${req.originalUrl} 시작`);
+  res.on('finish', () => {
+    console.log(`[pages] ${req.method} ${req.originalUrl} -> ${res.statusCode} (${Date.now() - startedAt}ms)`);
+  });
+  next();
+});
+
+// multer 오류는 라우트 핸들러의 try/catch보다 먼저 발생하므로 별도로 잡아야 한다.
+const pageUpload = (req: Request, res: Response, next: NextFunction) => {
+  upload.any()(req, res, (error: any) => {
+    if (!error) return next();
+
+    console.error('[pages] 파일 업로드 오류:', {
+      name: error.name,
+      code: error.code,
+      message: error.message,
+      field: error.field,
+    });
+
+    const isSizeError = error.code === 'LIMIT_FILE_SIZE' || error.code === 'LIMIT_FIELD_VALUE';
+    return res.status(isSizeError ? 413 : 400).json({
+      success: false,
+      message: isSizeError
+        ? '업로드 파일 또는 페이지 데이터의 크기가 허용 한도를 초과했습니다.'
+        : `파일 업로드 실패: ${error.message || '알 수 없는 오류'}`,
+      code: error.code || 'UPLOAD_ERROR',
+    });
+  });
+};
 
 // 1. 전체 페이지 목록 조회
 router.get('/', async (req: Request, res: Response) => {
@@ -198,7 +232,7 @@ const processFileData = (req: Request, files: any, blocks: any[], slides: any[],
 };
 
 // 3. 새 페이지 생성 (multer 추가 및 매핑 로직)
-router.post('/', upload.any(), async (req: Request, res: Response) => {
+router.post('/', pageUpload, async (req: Request, res: Response) => {
   try {
     
     let { menuId, title, contentBlocks, sliderData,pageMeta } = req.body;
@@ -226,7 +260,7 @@ router.post('/', upload.any(), async (req: Request, res: Response) => {
 });
 
 // 4. 기존 페이지 수정 (multer 추가 및 매핑 로직)
-router.put('/:id', upload.any(), async (req: Request, res: Response) => {
+router.put('/:id', pageUpload, async (req: Request, res: Response) => {
   try {
     const pageId = Number(req.params.id);
     let { menuId, title, contentBlocks, sliderData,pageMeta } = req.body;

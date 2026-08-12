@@ -32,7 +32,7 @@ const corsOptions: cors.CorsOptions = {
     // "http://www.syconsulting.co.kr",
     // "http://syconsulting.co.kr",
     // "https://www.syconsulting.co.kr",
-    // "https://syconsulting.co.kr",
+    // "https://syconsulting.co.kr", 
   ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],

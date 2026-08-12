@@ -37,6 +37,7 @@ const corsOptions: cors.CorsOptions = {
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
 };
+console.log(process.env.GEMINI_API_KEY);
 app.use(cors(corsOptions));
 
 // 💡 2. Body Parser 설정

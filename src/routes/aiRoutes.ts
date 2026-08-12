@@ -5,6 +5,7 @@ import path from 'path';
 const router = Router();
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
+
 router.post('/generate-page', async (req: Request, res: Response) => {
   try {
     const { prompt, targetType, currentContent } = req.body;

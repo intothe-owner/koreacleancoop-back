@@ -116,6 +116,7 @@ export const upload = multer({
           `uploads/${file.fieldname}-${uniqueSuffix}${ext}`,
         );
       } catch (error) {
+        console.log(error);
         cb(error);
       }
     },

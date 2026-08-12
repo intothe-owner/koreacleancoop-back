@@ -200,6 +200,7 @@ const processFileData = (req: Request, files: any, blocks: any[], slides: any[],
 // 3. 새 페이지 생성 (multer 추가 및 매핑 로직)
 router.post('/', upload.any(), async (req: Request, res: Response) => {
   try {
+    
     let { menuId, title, contentBlocks, sliderData,pageMeta } = req.body;
 
     // FormData로 넘어온 데이터는 문자열이므로 파싱 필요

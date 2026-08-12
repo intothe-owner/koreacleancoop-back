@@ -19,7 +19,7 @@ import path from 'path';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 4001;
 
 // 💡 1. CORS 설정을 가장 최상단으로 이동 (모든 요청에 대해 CORS 허용)
 const corsOptions: cors.CorsOptions = {

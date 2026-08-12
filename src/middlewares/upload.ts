@@ -104,8 +104,8 @@ export const upload = multer({
       try {
         const originalName = Buffer.from(
           file.originalname,
-          'latin1',
-        ).toString('utf8');
+          "latin1",
+        ).toString("utf8");
 
         const ext = path.extname(originalName).toLowerCase();
         const uniqueSuffix =
@@ -116,7 +116,7 @@ export const upload = multer({
           `uploads/${file.fieldname}-${uniqueSuffix}${ext}`,
         );
       } catch (error) {
-        console.log(error);
+        console.error("S3 파일명 생성 오류:", error);
         cb(error);
       }
     },
@@ -126,5 +126,9 @@ export const upload = multer({
 
   limits: {
     fileSize: 50 * 1024 * 1024,
+    fieldSize: 20 * 1024 * 1024,
+    files: 50,
+    fields: 20,
+    parts: 70,
   },
 });

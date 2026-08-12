@@ -38,10 +38,10 @@ router.put('/', upload.fields([{ name: 'logo', maxCount: 1 }, { name: 'favicon',
       if (files['logo'] && files['logo'][0]) {
         // 서버의 도메인(또는 호스트) + 경로를 조합하여 URL을 만듭니다.
         // 예: /uploads/logo-12345.png
-        updateData.logoUrl = `${baseUrl}/uploads/${files['logo'][0].filename}`;
+        updateData.logoUrl = (files['logo'][0] as any).location;
       }
       if (files['favicon'] && files['favicon'][0]) {
-        updateData.faviconUrl = `${baseUrl}/uploads/${files['favicon'][0].filename}`;
+        updateData.faviconUrl = (files['favicon'][0] as any).location;
       }
     }
     console.log(updateData);

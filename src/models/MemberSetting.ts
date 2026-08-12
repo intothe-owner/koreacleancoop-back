@@ -27,6 +27,7 @@ MemberSetting.init({
     comment: '승인 방식 (DOCUMENT: 증빙서류 업로드, EMAIL: 이메일 인증)' 
   },
   approvalNotice: { type: DataTypes.TEXT, comment: '가입 페이지에 표시할 승인 안내 및 서류 제출 가이드 텍스트' },
+  approvalWaitLevel: { type: DataTypes.INTEGER, defaultValue: 0, comment: '승인 대기 상태일 때 부여될 임시 레벨' },
 
   // --- 💡 [신규 추가] 약관 동의 설정 ---
   useTermsOfService: { type: DataTypes.BOOLEAN, defaultValue: true, comment: '가입 시 이용약관 동의 노출 여부' },

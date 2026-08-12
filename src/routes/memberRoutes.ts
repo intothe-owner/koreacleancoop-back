@@ -3,6 +3,8 @@ import bcrypt from 'bcrypt';
 import { Member } from '../models/Member';
 import { checkLevel } from '../middlewares/authMiddleware';
 import { Op } from 'sequelize';
+import { MemberSetting } from '../models';
+
 const router = Router();
 // 1. 회원 목록 조회 (관리자 전용: Level 9 이상)
 router.get('/', checkLevel, async (req: Request, res: Response) => {
@@ -15,13 +17,12 @@ router.get('/', checkLevel, async (req: Request, res: Response) => {
     const limit = Number(req.query.limit) || 20;
     const offset = (page - 1) * limit;
 
-    // 💡 프론트엔드에서 넘어온 검색 파라미터 받기
     const searchType = req.query.searchType as string;
     const keyword = req.query.keyword as string;
+    const levelFilter = req.query.level as string; // ✨ 레벨 필터 수신
 
     const where: any = {};
     
-    // 💡 키워드가 존재할 경우 검색 조건 추가
     if (keyword) {
       if (searchType === 'loginId') {
         where.loginId = { [Op.like]: `%${keyword}%` };
@@ -30,8 +31,13 @@ router.get('/', checkLevel, async (req: Request, res: Response) => {
       }
     }
 
+    // ✨ 특정 레벨 필터 적용 (예: 승인 대기 회원 조회 시 '0' 전달)
+    if (levelFilter !== undefined && levelFilter !== "") {
+      where.level = Number(levelFilter);
+    }
+
     const { count, rows: members } = await Member.findAndCountAll({
-      where, // 💡 완성된 where 조건 객체 삽입
+      where, 
       attributes: { exclude: ['password'] }, 
       order: [['createdAt', 'DESC']],
       limit,
@@ -123,5 +129,30 @@ router.delete('/:id', checkLevel, async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: '서버 오류' });
   }
 });
+router.patch('/:id/approve', checkLevel, async (req: Request, res: Response) => {
+  try {
+    if (req.user.level < 9) {
+      return res.status(403).json({ success: false, message: '회원을 승인할 권한이 없습니다.' });
+    }
 
+    const targetId = Number(req.params.id);
+    const member = await Member.findByPk(targetId);
+
+    if (!member) {
+      return res.status(404).json({ success: false, message: '회원을 찾을 수 없습니다.' });
+    }
+
+    // 💡 환경설정에서 신규 가입 시 부여되는 기본 등급(defaultLevel)을 조회
+    const setting = await MemberSetting.findByPk(1);
+    const defaultLvl = setting ? setting.getDataValue('defaultLevel') : 1;
+
+    // 해당 회원 레벨을 기본 가입 권한으로 상향
+    await member.update({ level: defaultLvl });
+
+    res.status(200).json({ success: true, message: '정상적으로 승인되었습니다.' });
+  } catch (error) {
+    console.error('회원 승인 오류:', error);
+    res.status(500).json({ success: false, message: '서버 오류' });
+  }
+});
 export default router;

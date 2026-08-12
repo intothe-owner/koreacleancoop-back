@@ -18,6 +18,9 @@ router.get('/', async (req: Request, res: Response) => {
         useMobile: true,
         useTermsOfService: true,
         usePrivacyPolicy: true,
+        useApproval: false,
+        approvalType: 'DOCUMENT',
+        approvalWaitLevel: 0, // ✨ 신규 추가: DB 초기 생성 시 기본 대기 레벨 0 할당
         defaultLevel: 1,
         levelNames: {
           0: "차단/대기", 1: "일반회원", 2: "정회원", 3: "우수회원",

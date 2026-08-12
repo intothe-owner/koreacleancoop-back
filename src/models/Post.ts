@@ -9,6 +9,7 @@ Post.init({
   writerName: { type: DataTypes.STRING, allowNull: false, comment: '작성자 이름 또는 닉네임' },
   password: { type: DataTypes.STRING, allowNull: true, comment: '비회원 글 수정/삭제용 비밀번호 (해시)' },
   isNotice: { type: DataTypes.BOOLEAN, defaultValue: false, comment: '공지사항 여부' },
+  category: { type: DataTypes.STRING, allowNull: true, comment: '게시물 카테고리' },
   title: { type: DataTypes.STRING, allowNull: false, comment: '게시물 제목' },
   content: { type: DataTypes.TEXT('long'), allowNull: false, comment: '게시물 본문 내용 (HTML 또는 텍스트)' },
   hitCount: { type: DataTypes.INTEGER, defaultValue: 0, comment: '조회수' },

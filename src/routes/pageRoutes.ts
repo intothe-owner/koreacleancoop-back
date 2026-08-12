@@ -151,8 +151,8 @@ const processFileData = (req: Request, files: any, blocks: any[], slides: any[],
       
       // 💡 2. 핵심 변경 사항: S3의 location 대신 로컬 filename을 사용하여 접근 URL 생성
       // req.protocol (http/https) 와 req.get('host') (도메인:포트) 를 조합합니다.
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
-      const fileUrl = `${baseUrl}/uploads/${file.filename}`;
+      
+      const fileUrl = file.location; 
 
       // 1. 슬라이드 파일인 경우
       if (fieldName.startsWith('slide_file_')) {

@@ -41,7 +41,7 @@ router.put('/', upload.fields([{ name: 'logo', maxCount: 1 }, { name: 'favicon',
         updateData.logoUrl = (files['logo'][0] as any).location;
       }
       if (files['favicon'] && files['favicon'][0]) {
-        updateData.faviconUrl = (files['favicon'][0] as any).location;
+        updateData.faviconUrl = (files['favicon'][0] as any).location; 
       }
     }
     console.log(updateData);

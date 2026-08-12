@@ -3,6 +3,8 @@ import { Router, Request, Response } from 'express';
 import { Op } from 'sequelize';
 import multer from 'multer';
 import fs from 'fs';
+import multerS3 from 'multer-s3';
+import { S3Client } from '@aws-sdk/client-s3';
 import path from 'path';
 import { Post, Comment, BoardConfig } from '../models'; 
 import { checkLevel } from '../middlewares/authMiddleware';
@@ -12,24 +14,20 @@ dotenv.config();
 const router = Router();
 
 // ==========================================
-// 📁 Multer 파일 업로드 설정
+// ☁️ AWS S3 클라이언트 설정
 // ==========================================
-const uploadDir = path.join(process.cwd(), 'public/uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
+const s3 = new S3Client({
+  region: process.env.AWS_REGION as string,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID as string,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY as string,
   },
-  filename: (req, file, cb) => {
-    file.originalname = Buffer.from(file.originalname, 'latin1').toString('utf8');
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  }
 });
 
+// ==========================================
+// 📁 Multer S3 업로드 설정
+// ==========================================
+// 파일 확장자 필터링 (exe, apk 차단)
 const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   const ext = path.extname(file.originalname).toLowerCase();
   if (ext === '.exe' || ext === '.apk') {
@@ -39,10 +37,22 @@ const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilt
 };
 
 export const upload = multer({ 
-  storage, 
+  storage: multerS3({
+    s3: s3,
+    bucket: process.env.AWS_S3_BUCKET_NAME as string,
+    contentType: multerS3.AUTO_CONTENT_TYPE, // S3에서 파일 타입을 자동으로 인식하도록 설정
+    key: (req, file, cb) => {
+      // 한글 파일명 깨짐 방지
+      const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+      // S3 버킷 내 저장될 경로 및 파일명 (uploads/폴더 하위에 저장)
+      cb(null, `uploads/${uniqueSuffix}${path.extname(originalName)}`);
+    }
+  }),
   fileFilter,
-  limits: { fileSize: 50 * 1024 * 1024 }
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB 제한
 });
+
 
 const findBoardConfig = async (param: string) => {
   return await BoardConfig.findOne({
@@ -103,9 +113,9 @@ router.get('/:boardId/posts', checkLevel, async (req: Request, res: Response) =>
 // 1-2. 게시글 작성
 router.post('/:boardId/posts', checkLevel, upload.array('attachments'), async (req: Request, res: Response) => {
   try {
-    const protocol = req.protocol; 
-    const host = req.get('host');  
-    const baseUrl = `${protocol}://${host}`;
+    // const protocol = req.protocol; 
+    // const host = req.get('host');  
+    // const baseUrl = `${protocol}://${host}`;
     const boardIdParam = req.params.boardId as string;
     const boardConfig = await findBoardConfig(boardIdParam);
     
@@ -123,7 +133,7 @@ router.post('/:boardId/posts', checkLevel, upload.array('attachments'), async (r
       uploadedMediaUrls = files.map((file: any) => file.location || `/uploads/${file.filename}`);
       const firstImage = files.find(file => /\.(jpeg|jpg|gif|png|webp)$/i.test(file.originalname));
       if (firstImage) {
-        thumbnailUrl = (firstImage as any).location || `${baseUrl}/uploads/${firstImage.filename}`;
+        thumbnailUrl = (firstImage as any).location;
       }
     }
 

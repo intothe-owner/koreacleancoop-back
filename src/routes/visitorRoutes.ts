@@ -1,3 +1,4 @@
+// routes/visitor.ts (또는 해당 라우터 파일)
 import { Router, Request, Response } from 'express';
 import { Op } from 'sequelize';
 import { VisitorLog } from '../models/VisitorLog';
@@ -50,19 +51,17 @@ router.get('/stats/page', async (req: Request, res: Response) => {
   }
 });
 
-// 3. 💡 [신규] 년/월/일/시간별 통계 조회
+// 3. 💡 [수정됨] 년/월/일/시간별 통계 조회
 router.get('/stats/time', async (req: Request, res: Response) => {
   try {
-    // 쿼리 파라미터 받기 (기본값: 일별)
-    // type: 'yearly', 'monthly', 'daily', 'hourly'
     const { type = 'daily', startDate, endDate, pageUrl } = req.query;
 
     const where: any = {};
     
-    // 1) 기간 필터링 적용
+    // 1) 기간 필터링 적용 (문자열을 직접 사용하여 타임존 꼬임 방지)
     if (startDate && endDate) {
       where.createdAt = {
-        [Op.between]: [new Date(`${startDate} 00:00:00`), new Date(`${endDate} 23:59:59`)]
+        [Op.between]: [`${startDate} 00:00:00`, `${endDate} 23:59:59`]
       };
     }
 
@@ -72,11 +71,10 @@ router.get('/stats/time', async (req: Request, res: Response) => {
     }
 
     // 3) type에 따른 MySQL 날짜 포맷팅 설정
-    // createdAt(생성일시)를 기준으로 그룹화합니다.
     let formatStr = '%Y-%m-%d'; 
-    if (type === 'yearly') formatStr = '%Y';                // 예: 2026
-    else if (type === 'monthly') formatStr = '%Y-%m';       // 예: 2026-07
-    else if (type === 'hourly') formatStr = '%Y-%m-%d %H:00'; // 예: 2026-07-29 14:00
+    if (type === 'yearly') formatStr = '%Y';                
+    else if (type === 'monthly') formatStr = '%Y-%m';       
+    else if (type === 'hourly') formatStr = '%Y-%m-%d %H:00'; 
 
     const stats = await VisitorLog.findAll({
       attributes: [
@@ -84,8 +82,9 @@ router.get('/stats/time', async (req: Request, res: Response) => {
         [sequelize.fn('COUNT', sequelize.col('id')), 'visitCount']
       ],
       where,
-      group: ['timePeriod'],
-      order: [['timePeriod', 'ASC']] // 과거 시간부터 오름차순 정렬
+      // 💡 TypeScript 타입 에러를 피하기 위해 sequelize.col() 사용 (또는 ['timePeriod'] 그대로 사용)
+      group: [sequelize.col('timePeriod')],
+      order: [[sequelize.col('timePeriod'), 'ASC']]
     });
 
     res.status(200).json({ success: true, data: stats });

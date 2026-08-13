@@ -34,6 +34,7 @@ BoardConfig.init({
   videoAutoPlay: { type: DataTypes.BOOLEAN, defaultValue: false, comment: '동영상 자동재생' },
   
   fileUploadCount: { type: DataTypes.INTEGER, defaultValue: 2, comment: '파일 첨부 개수' },
+  useEditor: { type: DataTypes.BOOLEAN, defaultValue: true, comment: '에디터 사용 여부' },
 }, { 
   sequelize, 
   tableName: 'board_configs',

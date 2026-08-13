@@ -6,7 +6,7 @@ import { MemberSetting } from '../models/MemberSetting';
 import { uploadAny } from '../middlewares/uploadAny';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'zerov_secret_key_2026';
+const JWT_SECRET = process.env.JWT_SECRET||'userLogin';
 
 // 1. 회원가입 API (파일 업로드 적용 및 레벨 분기 처리)
 router.post('/register', uploadAny.single('approvalFile'), async (req: Request, res: Response) => {
@@ -109,7 +109,7 @@ router.post('/login', async (req: Request, res: Response) => {
       return res.status(401).json({ success: false, message: '아이디 또는 비밀번호가 일치하지 않습니다.' });
     }
 
-    // JWT 토큰 발급 (유효기간 1일)
+    // JWT 토큰 발급 (유효기간 30일)
     const token = jwt.sign(
       { 
         id: user.getDataValue('id'), 
@@ -118,7 +118,7 @@ router.post('/login', async (req: Request, res: Response) => {
         level: user.getDataValue('level')
       },
       JWT_SECRET,
-      { expiresIn: '1d' }
+      { expiresIn: '30d' }
     );
 
     res.status(200).json({

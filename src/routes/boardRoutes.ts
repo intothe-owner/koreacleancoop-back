@@ -52,7 +52,10 @@ export const upload = multer({
   fileFilter,
   limits: { fileSize: 50 * 1024 * 1024 } // 50MB 제한
 });
-
+const uploadFields = upload.fields([
+  { name: 'attachments', maxCount: 10 },
+  { name: 'editorImages', maxCount: 20 }
+]);
 
 const findBoardConfig = async (param: string) => {
   return await BoardConfig.findOne({
@@ -111,11 +114,8 @@ router.get('/:boardId/posts', checkLevel, async (req: Request, res: Response) =>
 });
 
 // 1-2. 게시글 작성
-router.post('/:boardId/posts', checkLevel, upload.array('attachments'), async (req: Request, res: Response) => {
+router.post('/:boardId/posts', checkLevel, uploadFields, async (req: Request, res: Response) => {
   try {
-    // const protocol = req.protocol; 
-    // const host = req.get('host');  
-    // const baseUrl = `${protocol}://${host}`;
     const boardIdParam = req.params.boardId as string;
     const boardConfig = await findBoardConfig(boardIdParam);
     
@@ -123,15 +123,28 @@ router.post('/:boardId/posts', checkLevel, upload.array('attachments'), async (r
     if (req.user.level < boardConfig.getDataValue('writeLevel')) return res.status(403).json({ success: false, message: '글쓰기 권한이 없습니다.' });
 
     const configId = boardConfig.get('id') as number;
-    const { writerName, title, content, memberId, password, isNotice, category, extraData } = req.body;
+    let { writerName, title, content, memberId, password, isNotice, category, extraData } = req.body;
 
-    const files = req.files as Express.Multer.File[];
+    // files 객체에서 attachments와 editorImages 분리 추출[cite: 6]
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+    const attachmentFiles = files?.['attachments'] || [];
+    const editorImages = files?.['editorImages'] || [];
+
+    // 💡 에디터 본문 이미지 주소 치환 로직 (cid:id -> 실제 업로드 URL)
+    if (editorImages.length > 0) {
+      editorImages.forEach((file: any) => {
+        const s3Url = file.location || `/uploads/${file.filename}`;
+        const fileId = path.parse(file.originalname).name; // 확장자를 제외한 식별자 (예: img_12345)
+        content = content.replace(new RegExp(`cid:${fileId}`, 'g'), s3Url);
+      });
+    }
+
     let uploadedMediaUrls: string[] = [];
     let thumbnailUrl: string | null = null;
 
-    if (files && files.length > 0) {
-      uploadedMediaUrls = files.map((file: any) => file.location || `/uploads/${file.filename}`);
-      const firstImage = files.find(file => /\.(jpeg|jpg|gif|png|webp)$/i.test(file.originalname));
+    if (attachmentFiles.length > 0) {
+      uploadedMediaUrls = attachmentFiles.map((file: any) => file.location || `/uploads/${file.filename}`);
+      const firstImage = attachmentFiles.find(file => /\.(jpeg|jpg|gif|png|webp)$/i.test(file.originalname));
       if (firstImage) {
         thumbnailUrl = (firstImage as any).location;
       }
@@ -141,7 +154,7 @@ router.post('/:boardId/posts', checkLevel, upload.array('attachments'), async (r
       boardConfigId: configId,
       writerName,
       title,
-      content,
+      content, // 치환 완료된 최종 HTML 저장[cite: 6]
       memberId: memberId || null,
       password: password || null,
       isNotice: isNotice === 'true' || isNotice === true,
@@ -153,10 +166,7 @@ router.post('/:boardId/posts', checkLevel, upload.array('attachments'), async (r
 
     res.status(201).json({ success: true, data: newPost, message: '게시글이 작성되었습니다.' });
   } catch (error: any) {
-    console.error('게시글 작성 오류:', error);
-    if (error.message && error.message.includes('보안상')) {
-      return res.status(400).json({ success: false, message: error.message });
-    }
+    if (error.message && error.message.includes('보안상')) return res.status(400).json({ success: false, message: error.message });
     res.status(500).json({ success: false, message: '서버 오류' });
   }
 });
@@ -185,49 +195,51 @@ router.get('/posts/:postId', checkLevel, async (req: Request, res: Response) => 
 });
 
 // 1-4. 게시글 수정
-router.put('/posts/:postId', checkLevel, upload.array('attachments'), async (req: Request, res: Response) => {
+router.put('/posts/:postId', checkLevel, uploadFields, async (req: Request, res: Response) => {
   try {
-    const protocol = req.protocol; 
-    const host = req.get('host');  
-    const baseUrl = `${protocol}://${host}`;
     const postId = Number(req.params.postId);
     const post = await Post.findByPk(postId);
-    console.log(JSON.stringify(checkLevel));
     
     if (!post) return res.status(404).json({ success: false, message: '게시글을 찾을 수 없습니다.' });
 
-    // 💡 작성자 본인, 관리자, 혹은 비회원 비밀번호 일치 여부 체크
     const isAuthor = req.user.id && req.user.id === post.getDataValue('memberId');
     const isAdmin = req.user.level >= 9;
     const isGuestMatched = !post.getDataValue('memberId') && req.body.password && req.body.password === post.getDataValue('password');
     
-    if (!isAuthor && !isAdmin && !isGuestMatched) {
-      return res.status(403).json({ success: false, message: '수정 권한이 없습니다. (비밀번호가 다르거나 관리자가 아닙니다.)' });
-    }
+    if (!isAuthor && !isAdmin && !isGuestMatched) return res.status(403).json({ success: false, message: '수정 권한이 없습니다.' });
 
     const updateData: any = { ...req.body };
-    if (updateData.extraData && typeof updateData.extraData === 'string') {
-      updateData.extraData = JSON.parse(updateData.extraData);
-    }
+    if (updateData.extraData && typeof updateData.extraData === 'string') updateData.extraData = JSON.parse(updateData.extraData);
     
-    const files = req.files as Express.Multer.File[];
-    if (files && files.length > 0) {
-      const uploadedMediaUrls = files.map((file: any) => file.location || `${baseUrl}/uploads/${file.filename}`);
-      const firstImage = files.find(file => /\.(jpeg|jpg|gif|png|webp)$/i.test(file.originalname));
-      
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+    const attachmentFiles = files?.['attachments'] || [];
+    const editorImages = files?.['editorImages'] || [];
+
+    // 본문 이미지 주소 치환
+    if (editorImages.length > 0) {
+      let finalContent = updateData.content;
+      editorImages.forEach((file: any) => {
+        const s3Url = file.location || `/uploads/${file.filename}`;
+        const fileId = path.parse(file.originalname).name;
+        finalContent = finalContent.replace(new RegExp(`cid:${fileId}`, 'g'), s3Url);
+      });
+      updateData.content = finalContent;
+    }
+
+    if (attachmentFiles.length > 0) {
+      const uploadedMediaUrls = attachmentFiles.map((file: any) => file.location || `/uploads/${file.filename}`);
+      const firstImage = attachmentFiles.find(file => /\.(jpeg|jpg|gif|png|webp)$/i.test(file.originalname));
       updateData.mediaUrls = JSON.stringify(uploadedMediaUrls);
-      updateData.thumbnailUrl = firstImage ? ((firstImage as any).location || `${baseUrl}/uploads/${firstImage.filename}`) : null;
+      updateData.thumbnailUrl = firstImage ? ((firstImage as any).location || `/uploads/${firstImage.filename}`) : null;
     }
 
     await Post.update(updateData, { where: { id: postId } });
     const updatedPost = await Post.findByPk(postId);
     res.status(200).json({ success: true, data: updatedPost, message: '게시글이 수정되었습니다.' });
   } catch (error) {
-    console.error('게시글 수정 오류:', error);
     res.status(500).json({ success: false, message: '서버 오류' });
   }
 });
-
 // 1-5. 게시글 삭제
 router.delete('/posts/:postId', checkLevel, async (req: Request, res: Response) => {
   try {

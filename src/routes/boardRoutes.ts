@@ -172,10 +172,13 @@ router.post('/:boardId/posts', checkLevel, uploadFields, async (req: Request, re
 });
 
 // 1-3. 게시글 상세 조회
+// src/routes/boardRoutes.ts 내부 1-3. 게시글 상세 조회 부분 수정
+
+// 1-3. 게시글 상세 조회
 router.get('/posts/:postId', checkLevel, async (req: Request, res: Response) => {
   try {
     const postId = Number(req.params.postId);
-    const post = await Post.findByPk(postId);
+    const post = await Post.findByPk(postId); //[cite: 9]
 
     if (!post) return res.status(404).json({ success: false, message: '게시글을 찾을 수 없습니다.' });
 
@@ -187,7 +190,33 @@ router.get('/posts/:postId', checkLevel, async (req: Request, res: Response) => 
     await post.increment('hitCount', { by: 1 }); 
     await post.reload();
 
-    res.status(200).json({ success: true, data: post });
+    // 💡 이전글 (현재 글보다 ID가 큰 최신글 중 가장 작은 ID)[cite: 7]
+    const prevPost = await Post.findOne({
+      where: { 
+        boardConfigId: post.getDataValue('boardConfigId'), 
+        id: { [Op.gt]: postId } 
+      },
+      order: [['id', 'ASC']],
+      attributes: ['id', 'title']
+    });
+
+    // 💡 다음글 (현재 글보다 ID가 작은 과거글 중 가장 큰 ID)[cite: 7]
+    const nextPost = await Post.findOne({
+      where: { 
+        boardConfigId: post.getDataValue('boardConfigId'), 
+        id: { [Op.lt]: postId } 
+      },
+      order: [['id', 'DESC']],
+      attributes: ['id', 'title']
+    });
+
+    // 💡 data에 prevPost와 nextPost를 함께 응답 객체로 묶어서 반환[cite: 9]
+    res.status(200).json({ 
+      success: true, 
+      data: post,
+      prevPost: prevPost,
+      nextPost: nextPost 
+    });
   } catch (error) {
     console.error('게시글 상세 조회 오류:', error);
     res.status(500).json({ success: false, message: '서버 오류' });

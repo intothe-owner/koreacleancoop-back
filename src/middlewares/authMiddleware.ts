@@ -17,7 +17,7 @@ export const checkLevel = (req: Request, res: Response, next: NextFunction) => {
   req.user = { level: 1 }; // 기본값: 비회원(Level 1)
   
   // 디버깅용: 토큰이 잘 들어오는지 확인
-  //console.log("전달받은 authHeader:", authHeader);
+  console.log("전달받은 authHeader:", authHeader);
 
   if (authHeader && authHeader.startsWith('Bearer ')) {
     let token = authHeader.split(' ')[1];

@@ -9,6 +9,7 @@ const router = Router();
 // 1. 회원 목록 조회 (관리자 전용: Level 9 이상)
 router.get('/', checkLevel, async (req: Request, res: Response) => {
   try {
+    console.log(req.user.level);
     if (req.user.level < 9) {
       return res.status(403).json({ success: false, message: '회원 목록을 볼 권한이 없습니다.' });
     }
@@ -43,6 +44,7 @@ router.get('/', checkLevel, async (req: Request, res: Response) => {
       limit,
       offset
     });
+    console.log(count);
 
     res.status(200).json({ 
       success: true, 

@@ -178,14 +178,13 @@ router.get('/boards/:id', async (req: Request, res: Response) => {
 });
 
 // JSON 데이터와 파일을 매핑해주는 헬퍼 함수
+// JSON 데이터와 파일을 매핑해주는 헬퍼 함수
 const processFileData = (req: Request, files: any, blocks: any[], slides: any[], pageMeta: any) => {
   if (files && Array.isArray(files)) {
     files.forEach((file: any) => {
       const fieldName = file.fieldname;
       
-      // 💡 2. 핵심 변경 사항: S3의 location 대신 로컬 filename을 사용하여 접근 URL 생성
-      // req.protocol (http/https) 와 req.get('host') (도메인:포트) 를 조합합니다.
-      
+      // S3의 location (업로드된 최종 URL)
       const fileUrl = file.location; 
 
       // 1. 슬라이드 파일인 경우
@@ -200,7 +199,14 @@ const processFileData = (req: Request, files: any, blocks: any[], slides: any[],
           container.columns.forEach((col: any) => {
             col.elements.forEach((el: any) => {
               if (el.id === elId) {
-                el.content = fileUrl; // 업로드된 경로로 치환
+                // 💡 타입별로 분기 처리
+                if (el.type === 'IMAGE' || el.type === 'VIDEO' || el.type === 'AUDIO') {
+                  // 단일 미디어는 전체 내용을 URL로 교체
+                  el.content = fileUrl; 
+                } else if (el.type === 'TEXT' || el.type === 'CARD') {
+                  // 💡 HTML 에디터 내용인 경우, 전체를 덮어쓰지 않고 Base64 또는 Blob 형태의 임시 src만 S3 주소로 치환
+                  el.content = el.content.replace(/src="(data:image\/[^;]+;base64,[^"]+|blob:[^"]+)"/, `src="${fileUrl}"`);
+                }
               }
             });
           });
@@ -216,7 +222,8 @@ const processFileData = (req: Request, files: any, blocks: any[], slides: any[],
             container.columns.forEach((col: any) => {
               col.elements.forEach((el: any) => {
                 if (el.id === elId && el.type === 'TABLE' && el.tableData && el.tableData.cells && el.tableData.cells[cellKey]) {
-                  el.tableData.cells[cellKey].content = el.tableData.cells[cellKey].content.replace(/src="blob:[^"]+"/, `src="${fileUrl}"`);
+                  // 💡 테이블 셀 내부에서도 Base64 또는 Blob 형태의 임시 src만 치환하도록 정규식 적용
+                  el.tableData.cells[cellKey].content = el.tableData.cells[cellKey].content.replace(/src="(data:image\/[^;]+;base64,[^"]+|blob:[^"]+)"/, `src="${fileUrl}"`);
                 }
               });
             });

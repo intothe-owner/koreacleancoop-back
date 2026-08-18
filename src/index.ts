@@ -26,8 +26,8 @@ const corsOptions: cors.CorsOptions = {
   origin: [
     "http://localhost:3000",
     "http://113.131.151.103:3000",
-    "http://www.koreacleancoop.kr",
-    "http://koreacleancoop.kr",
+    "https://www.koreacleancoop.kr",
+    "https://koreacleancoop.kr",
     // "http://113.131.151.103:8088",
     // "http://www.syconsulting.co.kr",
     // "http://syconsulting.co.kr",

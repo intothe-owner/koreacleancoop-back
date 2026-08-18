@@ -142,6 +142,7 @@ router.post('/login', async (req: Request, res: Response) => {
 router.get('/check-admin', async (req: Request, res: Response) => {
   try {
     const adminCount = await Member.count({ where: { level: 10 } });
+    console.log(adminCount);
     res.status(200).json({ success: true, hasAdmin: adminCount > 0 });
   } catch (error) {
     console.error('관리자 확인 오류:', error);

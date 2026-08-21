@@ -214,7 +214,6 @@ router.get("/boards/:id", async (req: Request, res: Response) => {
 });
 
 // JSON 데이터와 파일을 매핑해주는 헬퍼 함수
-// JSON 데이터와 파일을 매핑해주는 헬퍼 함수
 const processFileData = (
   req: Request,
   files: any,

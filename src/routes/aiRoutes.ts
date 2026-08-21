@@ -8,6 +8,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 router.post('/generate-page', async (req: Request, res: Response) => {
   try {
+    console.log(process.env.GEMINI_API_KEY);
     const { prompt, targetType, currentContent } = req.body;
 
     let systemInstruction = `당신은 웹 페이지 빌더 도우미입니다. 사용자의 요청을 분석하여 아래 JSON 배열 형식으로만 응답하세요.

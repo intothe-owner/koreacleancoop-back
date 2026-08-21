@@ -1,10 +1,17 @@
 // src/routes/popupRoutes.ts
 import { Router, Request, Response } from 'express';
 import { Op } from 'sequelize';
+import path from 'path'; // ✨ 파일명(id) 추출을 위해 추가
 import { Popup } from '../models/Popup';
-import { upload } from '../middlewares/upload'; // 기존 multer 미들웨어 경로에 맞게 수정
+import { upload } from '../middlewares/upload'; 
 
 const router = Router();
+
+// ✨ 단일 업로드 대신 에디터 이미지와 대표 첨부파일을 함께 받을 수 있도록 필드 설정
+const uploadFields = upload.fields([
+  { name: 'attachment', maxCount: 1 },
+  { name: 'editorImages', maxCount: 20 }
+]);
 
 // 1. 관리자용: 전체 팝업 목록 조회
 router.get('/', async (req: Request, res: Response) => {
@@ -33,18 +40,30 @@ router.get('/active', async (req: Request, res: Response) => {
   }
 });
 
-// 3. 팝업 생성 (파일 업로드 포함)
-router.post('/', upload.single('attachment'), async (req: Request, res: Response) => {
+// 3. 팝업 생성 (파일 업로드 및 에디터 이미지 치환 포함)
+router.post('/', uploadFields, async (req: Request, res: Response) => {
   try {
     const data = { ...req.body };
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
     
-    if (req.file) {
-      // 💡 로컬 하드코딩 주소 대신 S3 고유 URL(location)을 저장합니다.
-      data.attachmentUrl = (req.file as any).location;
+    // 💡 1. 대표 이미지(단일 첨부) 처리
+    if (files && files['attachment'] && files['attachment'].length > 0) {
+      data.attachmentUrl = (files['attachment'][0] as any).location;
     }
     
+    // 💡 2. 에디터 내부 이미지 처리 (cid 치환)
+    const editorImages = files?.['editorImages'] || [];
+    if (editorImages.length > 0 && data.content) {
+      editorImages.forEach((file: any) => {
+        const s3Url = file.location || `/uploads/${file.filename}`;
+        const fileId = path.parse(file.originalname).name;
+        // content 내의 <img src="cid:xxx"> 를 실제 업로드된 URL로 치환
+        data.content = data.content.replace(new RegExp(`cid:${fileId}`, 'g'), s3Url);
+      });
+    }
+
     // Boolean 형변환
-    data.isActive = data.isActive === 'true';
+    data.isActive = data.isActive === 'true' || data.isActive === true;
 
     const popup = await Popup.create(data);
     res.status(201).json({ success: true, data: popup });
@@ -55,17 +74,29 @@ router.post('/', upload.single('attachment'), async (req: Request, res: Response
 });
 
 // 4. 팝업 수정
-router.put('/:id', upload.single('attachment'), async (req: Request, res: Response) => {
+router.put('/:id', uploadFields, async (req: Request, res: Response) => {
   try {
     const data = { ...req.body };
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
     
-    if (req.file) {
-      // 💡 로컬 주소 대신 S3에 업로드된 파일의 고유 URL(location)을 할당합니다.
-      // TypeScript 환경이므로 타입 에러 방지를 위해 (req.file as any)로 처리합니다.
-      data.attachmentUrl = (req.file as any).location;
+    // 💡 1. 대표 이미지 처리
+    if (files && files['attachment'] && files['attachment'].length > 0) {
+      data.attachmentUrl = (files['attachment'][0] as any).location;
     }
     
-    if (data.isActive !== undefined) data.isActive = data.isActive === 'true';
+    // 💡 2. 에디터 내부 이미지 처리 (cid 치환)
+    const editorImages = files?.['editorImages'] || [];
+    if (editorImages.length > 0 && data.content) {
+      editorImages.forEach((file: any) => {
+        const s3Url = file.location || `/uploads/${file.filename}`;
+        const fileId = path.parse(file.originalname).name;
+        data.content = data.content.replace(new RegExp(`cid:${fileId}`, 'g'), s3Url);
+      });
+    }
+    
+    if (data.isActive !== undefined) {
+      data.isActive = data.isActive === 'true' || data.isActive === true;
+    }
 
     await Popup.update(data, { where: { id: req.params.id } });
     const updatedPopup = await Popup.findByPk(req.params.id as string);

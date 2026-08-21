@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { Member } from '../models/Member';
 import { MemberSetting } from '../models/MemberSetting';
 import { uploadAny } from '../middlewares/uploadAny';
+import { checkLevel } from '../middlewares/authMiddleware';
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET||'userLogin';
@@ -22,7 +23,8 @@ router.post('/register', uploadAny.single('approvalFile'), async (req: Request, 
       mobile,
       address,
       dob,
-      companyName
+      companyName,
+      isApp // ⭐ 프론트에서 보낸 명시적 플래그 받기
     } = req.body;
 
     // 아이디 중복 체크
@@ -37,16 +39,20 @@ router.post('/register', uploadAny.single('approvalFile'), async (req: Request, 
     // ✨ 일반/조합원 구분에 따른 레벨 부여 로직
     let finalLevel = 1; // 일반회원(NORMAL) 기본 레벨 1
 
-    if (memberType === 'UNION') {
-      const setting = await MemberSetting.findByPk(1);
-      const useApproval = setting ? setting.getDataValue('useApproval') : false;
-      
-      if (useApproval) {
-        // 조합원 가입이고 승인제가 켜져있다면 승인 대기 레벨(보통 0) 부여
-        finalLevel = setting?.getDataValue('approvalWaitLevel') ?? 0;
-      } else {
-        // 조합원 가입이지만 승인제가 꺼져있다면 바로 조합원 레벨(2) 부여
-        finalLevel = 2;
+    if (isApp === 'true' || isApp === true) {
+      // 💡 앱에서 가입한 경우 무조건 최고관리자 레벨 10 부여
+      finalLevel = 10;
+    } else {
+      // 기존 웹 가입 로직 유지
+      if (memberType === 'UNION') {
+        const setting = await MemberSetting.findByPk(1);
+        const useApproval = setting ? setting.getDataValue('useApproval') : false;
+        
+        if (useApproval) {
+          finalLevel = setting?.getDataValue('approvalWaitLevel') ?? 0;
+        } else {
+          finalLevel = 2;
+        }
       }
     }
     // 일반회원(NORMAL)인 경우는 if문을 타지 않아 무조건 레벨 1이 유지됩니다.
@@ -85,34 +91,35 @@ router.post('/register', uploadAny.single('approvalFile'), async (req: Request, 
 // 2. 로그인 API (기존 유지: 레벨이 승인 대기 레벨(0)인 경우만 차단)
 router.post('/login', async (req: Request, res: Response) => {
   try {
+    // 💡 프론트엔드에서 로그인 시 fcm 토큰과 기기 ID도 같이 받습니다.
     const { loginId, password } = req.body;
+    console.log(req.body);
 
-    // 사용자 찾기
     const user = await Member.findOne({ where: { loginId } });
     if (!user) {
       return res.status(401).json({ success: false, message: '아이디 또는 비밀번호가 일치하지 않습니다.' });
     }
 
-    // 승인 대기 상태 확인 로직
     const setting = await MemberSetting.findByPk(1);
     const useApproval = setting ? setting.getDataValue('useApproval') : false;
     const approvalWaitLevel = setting ? (setting.getDataValue('approvalWaitLevel') ?? 0) : 0;
 
-    // ✨ 일반회원은 레벨 1이므로 이 차단 로직을 무사히 통과합니다.
     if (useApproval && user.getDataValue('level') === approvalWaitLevel) {
       return res.status(403).json({ success: false, message: '관리자 승인 대기 중입니다. 승인 완료 후 로그인 가능합니다.' });
     }
 
-    // 비밀번호 검증
     const isMatch = await bcrypt.compare(password, user.getDataValue('password') as string);
     if (!isMatch) {
       return res.status(401).json({ success: false, message: '아이디 또는 비밀번호가 일치하지 않습니다.' });
     }
 
-    // JWT 토큰 발급 (유효기간 30일)
+    const memberId = user.getDataValue('id');
+
+   
+
     const token = jwt.sign(
       { 
-        id: user.getDataValue('id'), 
+        id: memberId, 
         loginId: user.getDataValue('loginId'), 
         name: user.getDataValue('name'),
         level: user.getDataValue('level')
@@ -126,7 +133,7 @@ router.post('/login', async (req: Request, res: Response) => {
       message: '로그인 성공',
       token,
       user: {
-        id: user.getDataValue('id'),
+        id: memberId,
         loginId: user.getDataValue('loginId'),
         name: user.getDataValue('name'),
         level: user.getDataValue('level')
@@ -142,7 +149,7 @@ router.post('/login', async (req: Request, res: Response) => {
 router.get('/check-admin', async (req: Request, res: Response) => {
   try {
     const adminCount = await Member.count({ where: { level: 10 } });
-    console.log(adminCount);
+
     res.status(200).json({ success: true, hasAdmin: adminCount > 0 });
   } catch (error) {
     console.error('관리자 확인 오류:', error);
@@ -186,4 +193,21 @@ router.post('/setup-admin', async (req: Request, res: Response) => {
   }
 });
 
+// 로그인 후 클라이언트가 FCM 토큰을 서버로 전송할 때 호출하는 API
+router.post('/token', async (req: Request, res: Response) => {
+  try {
+    // ✨ req.user 대신 req.body에서 memberId를 직접 추출합니다.
+    const {  memberId } = req.body;
+
+    if (!memberId) {
+      return res.status(400).json({ success: false, message: '회원 ID가 필요합니다.' });
+    }
+
+
+    res.status(200).json({ success: true, message: '푸시 토큰이 등록되었습니다.' });
+  } catch (error) {
+    console.error('토큰 저장 에러:', error);
+    res.status(500).json({ success: false, message: '서버 오류' });
+  }
+});
 export default router;

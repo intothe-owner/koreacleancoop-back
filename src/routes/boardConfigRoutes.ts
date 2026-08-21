@@ -43,17 +43,17 @@ router.get('/:id', async (req: Request, res: Response) => {
 });
 
 // 3. 새 게시판 설정 생성
+// 3. 새 게시판 설정 생성 (usePush 값 포함)
 router.post('/', async (req: Request, res: Response) => {
   try {
     const { tableName } = req.body;
 
-    // 테이블 이름 중복 체크
     const existingBoard = await BoardConfig.findOne({ where: { tableName } });
     if (existingBoard) {
       return res.status(400).json({ success: false, message: '이미 존재하는 게시판 아이디(영문)입니다.' });
     }
 
-    // req.body에 있는 모든 필드를 그대로 모델에 전달하여 생성
+    // ✨ req.body에 usePush 필드가 포함되어 있으면 자동으로 DB에 반영됩니다.
     const newBoardConfig = await BoardConfig.create(req.body);
 
     res.status(201).json({ success: true, data: newBoardConfig, message: '게시판 설정이 생성되었습니다.' });
@@ -63,13 +63,12 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-// 4. 게시판 설정 수정
+// 4. 게시판 설정 수정 (usePush 값 포함)
 router.put('/:id', async (req: Request, res: Response) => {
   try {
     const boardId = Number(req.params.id);
-    const updateData = req.body;
+    const updateData = req.body; // ✨ 프론트엔드에서 수정한 usePush 값도 이곳에 포함됨
     
-    // 테이블 이름 변경 시 중복 체크 (자신의 ID는 제외)
     if (updateData.tableName) {
         const existingBoard = await BoardConfig.findOne({ where: { tableName: updateData.tableName } });
         if (existingBoard && existingBoard.getDataValue('id') !== boardId) {

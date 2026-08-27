@@ -10,10 +10,12 @@ import path from 'path';
 import { Post, Comment, BoardConfig, Member } from '../models'; // ✨ Member 추가
 import { checkLevel } from '../middlewares/authMiddleware';
 import dotenv from 'dotenv';
-
+import svgCaptcha from 'svg-captcha';
+import crypto from 'crypto'
 dotenv.config();
 const router = Router();
 
+const CAPTCHA_SECRET = process.env.CAPTCHA_SECRET || 'my-super-secret-captcha-key';
 // ==========================================
 // ☁️ AWS S3 클라이언트 설정
 // ==========================================
@@ -65,6 +67,33 @@ const findBoardConfig = async (param: string) => {
     }
   });
 };
+
+router.get('/captcha', (req: Request, res: Response) => {
+  // 1. SVG 캡차 이미지 생성
+  const captcha = svgCaptcha.create({
+    size: 5,        // 글자 수
+    noise: 3,       // 방해 선 개수
+    color: true,    // 글자 색상 적용
+    background: '#ffffff'
+  });
+
+  const text = captcha.text.toLowerCase(); // 실제 정답
+  const expires = Date.now() + 1000 * 60 * 5; // 유효시간 5분 설정
+
+  // 2. 정답 + 유효시간 + 비밀키를 조합해 절대 복호화할 수 없는 해시(Hash) 생성
+  const hash = crypto.createHmac('sha256', CAPTCHA_SECRET)
+                     .update(`${text}:${expires}`)
+                     .digest('hex');
+
+  // 3. 프론트엔드로는 정답 대신 암호화된 토큰과 유효시간만 보냄
+  const token = `${hash}:${expires}`;
+
+  res.json({
+    success: true,
+    svg: captcha.data, // HTML <img>처럼 바로 쓸 수 있는 태그 데이터
+    token: token
+  });
+});
 
 // ==========================================
 // 1. 게시글 (Post) 라우터
@@ -121,7 +150,29 @@ router.post('/:boardId/posts', checkLevel, uploadFields, async (req: Request, re
     if (req.user.level < boardConfig.getDataValue('writeLevel')) return res.status(403).json({ success: false, message: '글쓰기 권한이 없습니다.' });
 
     const configId = boardConfig.get('id') as number;
-    let { writerName, title, content, memberId, password, isNotice, category, extraData } = req.body;
+    let { writerName, title, content, memberId, password, isNotice, category, extraData, captchaInput, expectedCaptcha,captchaToken } = req.body;
+    // 🛡️ [보안 추가] 비회원(게스트)인 경우 캡차(자동등록방지) 백엔드 검증
+    if (!req.user || !req.user.id) {
+      if (!captchaInput || !captchaToken) {
+        return res.status(400).json({ success: false, message: '캡차 정보가 누락되었습니다.' });
+      }
+
+      const [hash, expires] = captchaToken.split(':');
+
+      // 유효시간 검사 (5분 초과 시 거부)
+      if (Date.now() > Number(expires)) {
+        return res.status(400).json({ success: false, message: '캡차 입력 시간이 만료되었습니다. 다시 시도해주세요.' });
+      }
+
+      // 사용자가 입력한 값(captchaInput)으로 똑같은 해시를 만들어보고, 기존 토큰과 일치하는지 비교!
+      const expectedHash = crypto.createHmac('sha256', CAPTCHA_SECRET)
+                                 .update(`${String(captchaInput).toLowerCase()}:${expires}`)
+                                 .digest('hex');
+
+      if (hash !== expectedHash) {
+        return res.status(400).json({ success: false, message: '자동등록방지 문자가 일치하지 않습니다.' });
+      }
+    }
 
     const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
     const attachmentFiles = files?.['attachments'] || [];

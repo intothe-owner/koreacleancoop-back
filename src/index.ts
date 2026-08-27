@@ -23,17 +23,7 @@ const PORT = process.env.PORT || 4000;
 
 // 💡 1. CORS 설정을 가장 최상단으로 이동 (모든 요청에 대해 CORS 허용)
 const corsOptions: cors.CorsOptions = {
-  origin: [
-    "http://localhost:3000",
-    "http://113.131.151.103:3000",
-    "https://www.koreacleancoop.kr",
-    "https://koreacleancoop.kr",
-    // "http://113.131.151.103:8088",
-    // "http://www.syconsulting.co.kr",
-    // "http://syconsulting.co.kr",
-    // "https://www.syconsulting.co.kr",
-    // "https://syconsulting.co.kr", 
-  ],
+  origin: "*",
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
 };

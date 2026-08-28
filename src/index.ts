@@ -49,9 +49,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/popups', popupRoutes);
 app.use('/api/visitors', visitorRoutes);
 app.use('/api/members', memberRoutes);
-
+const syncOptions = process.env.NODE_ENV === 'production' ? {} : { alter: true };
 // DB 동기화 및 서버 실행
-sequelize.sync({ alter: true }) // alter: true는 스키마 변경 시 테이블을 자동으로 수정해 줍니다.
+sequelize.sync(syncOptions) // alter: true는 스키마 변경 시 테이블을 자동으로 수정해 줍니다.
   .then(() => {
     console.log('✅ 데이터베이스 연결 및 테이블 동기화 완료');
     app.listen(PORT, () => {

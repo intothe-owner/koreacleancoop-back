@@ -23,6 +23,7 @@
     "multer": "^2.2.0",
     "multer-s3": "^3.0.1",
     "mysql2": "^3.23.1",
+    "pdf2pic": "^3.2.0",
     "sequelize": "^6.37.8",
     "svg-captcha": "^1.4.0"
   },

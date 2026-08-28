@@ -14,6 +14,7 @@ import authRoutes from './routes/authRoutes';
 import popupRoutes from './routes/popupRoutes';
 import visitorRoutes from './routes/visitorRoutes';
 import memberRoutes from './routes/memberRoutes';
+import certificationRoutes from './routes/certificationRoutes';
 import path from 'path';
 
 dotenv.config();
@@ -49,6 +50,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/popups', popupRoutes);
 app.use('/api/visitors', visitorRoutes);
 app.use('/api/members', memberRoutes);
+app.use('/api/certifications',certificationRoutes);
 const syncOptions = process.env.NODE_ENV === 'production' ? {} : { alter: true };
 // DB 동기화 및 서버 실행
 sequelize.sync(syncOptions) // alter: true는 스키마 변경 시 테이블을 자동으로 수정해 줍니다.

@@ -35,14 +35,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 
-# =====================================
-# 실행 중 필요한 시스템 패키지 설치
-# =====================================
-RUN apk add --no-cache \
-    ghostscript \
-    graphicsmagick \
-    font-noto-cjk \
-    font-noto-emoji
+
+
 
 
 # =====================================

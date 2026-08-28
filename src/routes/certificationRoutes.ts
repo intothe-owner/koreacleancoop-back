@@ -36,7 +36,7 @@ if (!fs.existsSync(tempDir)) {
 // ==========================================
 // 1. 인증·인허가 목록 조회 (GET) - ✨ 신규 추가
 // ==========================================
-router.get('/certifications', async (req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
   try {
     const certifications = await Certification.findAll({
       order: [['createdAt', 'DESC']] // 최신순 정렬
@@ -51,7 +51,7 @@ router.get('/certifications', async (req: Request, res: Response) => {
 // ==========================================
 // 2. 인증·인허가 등록 (POST)
 // ==========================================
-router.post('/certifications', uploadLocal.single('file'), async (req: Request, res: Response) => {
+router.post('/', uploadLocal.single('file'), async (req: Request, res: Response) => {
   try {
     const { title, issuer, issueDate, description, isActive } = req.body;
     const file = req.file;
@@ -124,7 +124,7 @@ router.post('/certifications', uploadLocal.single('file'), async (req: Request, 
 // ==========================================
 // 3. 인증·인허가 수정 (PUT) - ✨ 신규 추가
 // ==========================================
-router.put('/certifications/:id', uploadLocal.single('file'), async (req: Request, res: Response) => {
+router.put('/:id', uploadLocal.single('file'), async (req: Request, res: Response) => {
   try {
     const certId = Number(req.params.id);
     const cert = await Certification.findByPk(certId);
@@ -215,7 +215,7 @@ router.put('/certifications/:id', uploadLocal.single('file'), async (req: Reques
 // ==========================================
 // 4. 인증·인허가 삭제 (DELETE)
 // ==========================================
-router.delete('/certifications/:id', async (req: Request, res: Response) => {
+router.delete('/:id', async (req: Request, res: Response) => {
   try {
     const certId = Number(req.params.id);
     const cert = await Certification.findByPk(certId);

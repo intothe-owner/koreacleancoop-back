@@ -64,7 +64,7 @@ router.get('/', checkLevel, async (req: Request, res: Response) => {
 router.put('/:id', checkLevel, async (req: Request, res: Response) => {
   try {
     const targetId = Number(req.params.id);
-    const { name, nickname, phone, mobile, address, level, password } = req.body;
+    const { name, nickname, phone, mobile,postcode, address,address_detail, level, password } = req.body;
 
     // 권한 검증: 수정 대상이 '나' 자신이거나, 내 레벨이 9(관리자) 이상인지 확인
     if (req.user.id !== targetId && req.user.level < 9) {
@@ -77,7 +77,10 @@ router.put('/:id', checkLevel, async (req: Request, res: Response) => {
     if (nickname) updateData.nickname = nickname;
     if (phone) updateData.phone = phone;
     if (mobile) updateData.mobile = mobile;
+    if (postcode) updateData.postcode = postcode;
     if (address) updateData.address = address;
+    if (address_detail) updateData.address_detail = address_detail;
+
 
     // 💡 회원의 권한(Level) 등급 변경은 '관리자(Level >= 9)'만 가능하도록 통제
     if (level !== undefined && req.user.level >= 9) {

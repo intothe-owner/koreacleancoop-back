@@ -23,7 +23,9 @@ Member.init({
   nickname: { type: DataTypes.STRING },
   phone: { type: DataTypes.STRING },
   mobile: { type: DataTypes.STRING },
+  postcode:{type: DataTypes.STRING},
   address: { type: DataTypes.STRING },
+  address_detail: { type: DataTypes.STRING },
   dob: { type: DataTypes.DATEONLY },
   level: { type: DataTypes.INTEGER, defaultValue: 1, comment: '회원 권한 레벨' },
   snsProvider: { 

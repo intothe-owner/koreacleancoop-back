@@ -10,6 +10,7 @@ import { Member } from './Member';
 import { VisitorLog } from './VisitorLog';
 import { Policy } from './Policy';
 import { Certification } from './Certification';
+import { CoopMember } from './CoopMember';
 
 // --- 테이블 간의 관계(Relation) 정의 ---
 
@@ -48,5 +49,6 @@ export {
     MemberSetting,
     VisitorLog,
     Policy, 
-    Certification
+    Certification,
+    CoopMember
 };

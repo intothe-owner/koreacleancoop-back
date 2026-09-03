@@ -819,4 +819,21 @@ router.get("/session/:sessionId/play-data", async (req: Request, res: Response) 
     return res.status(500).json({ ok: false, message: "데이터 로드 중 오류가 발생했습니다." });
   }
 });
+
+router.patch("/:id/close", checkLevel, async (req: Request, res: Response) => {
+  try {
+    const examId = Number(req.params.id);
+    const exam = await CertificationExam.findByPk(examId);
+
+    if (!exam) return res.status(404).json({ ok: false, message: "시험을 찾을 수 없습니다." });
+    if (exam.status === 'CLOSED') return res.status(400).json({ ok: false, message: "이미 종료된 시험입니다." });
+
+    await exam.update({ status: 'CLOSED' });
+
+    return res.status(200).json({ ok: true, message: "시험이 영구적으로 종료되었습니다." });
+  } catch (error) {
+    console.error("시험 종료 에러:", error);
+    return res.status(500).json({ ok: false, message: "시험 종료 중 서버 오류가 발생했습니다." });
+  }
+});
 export default router;

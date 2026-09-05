@@ -78,6 +78,29 @@ router.post("/", checkLevel, async (req: Request, res: Response) => {
     return res.status(500).json({ ok: false, message: "등록에 실패했습니다." });
   }
 });
+/**
+ * [추가] 과거 시험 기록 조회 API (수강생용)
+ */
+router.get("/lookup", async (req: Request, res: Response) => {
+  try {
+    const { centerName, studentName } = req.query;
+    console.log(centerName);
+    if (!centerName || !studentName) {
+      return res.status(400).json({ ok: false, message: "센터명과 이름을 입력해 주세요." });
+    }
+
+    const sessions = await ExamSession.findAll({
+      where: { centerName: String(centerName), studentName: String(studentName), isSubmitted: true },
+      order: [['createdAt', 'DESC']],
+      raw: true
+    });
+
+    return res.status(200).json({ ok: true, data: sessions });
+  } catch (error) {
+    console.error("조회 에러:", error);
+    return res.status(500).json({ ok: false, message: "기록 조회 중 서버 오류가 발생했습니다." });
+  }
+});
 router.get("/:id", checkLevel, async (req: Request, res: Response) => {
   try {
     const examId = Number(req.params.id);
@@ -310,7 +333,42 @@ router.post("/join", async (req: Request, res: Response) => {
       return res.status(400).json({ ok: false, message: "현재 입장이 불가능한 시험입니다." });
     }
 
-    // 💡 [추가된 로직] 시험이 이미 시작된 상태에서 입장(지각)하는 경우 즉시 문제 배정
+    // 💡 [2번 기능 핵심 로직] 동일 센터 & 동일 이름 중복 접속 방지 검사
+    const trimmedCenter = centerName.trim();
+    const trimmedStudent = studentName.trim();
+
+    const existingSession = await ExamSession.findOne({
+      where: {
+        examId: exam.id,
+        centerName: trimmedCenter,
+        studentName: trimmedStudent
+      }
+    });
+
+    // 이미 같은 이름으로 생성된 기록이 있다면?
+    if (existingSession) {
+      // 만약 이미 제출까지 완료한 사람이라면 얄짤없이 튕겨냄 (3번 기능 선제 방어)
+      if (existingSession.isSubmitted) {
+        return res.status(400).json({ 
+          ok: false, 
+          message: "이미 답안 제출이 완료된 수강생입니다. 중복 응시할 수 없습니다." 
+        });
+      }
+
+      // 💡 새로운 줄을 중복 생성하지 않고, 기존에 진행 중이던 세션을 그대로 반환 (강제 이어풀기)
+      return res.status(200).json({
+        ok: true,
+        message: "기존 접속 기록이 확인되어 이어풀기로 연결됩니다.",
+        data: {
+          sessionId: existingSession.id,
+          examId: exam.id,
+          examStatus: exam.status
+        }
+      });
+    }
+
+    // --- (아래는 기존에 있던 지각생 문제 배정 및 신규 생성 로직 그대로) ---
+
     let randomQuestions = null;
     if (exam.status === 'STARTED') {
       const allQuestions = await Question.findAll({ 
@@ -324,19 +382,17 @@ router.post("/join", async (req: Request, res: Response) => {
       randomQuestions = shuffledIds.slice(0, exam.questionCount);
     }
 
-    // 1. 수강생 DB 저장 (randomQuestions 포함)
     const newSession = await ExamSession.create({
       examId: exam.id,
-      centerName,
-      studentName,
+      centerName: trimmedCenter,
+      studentName: trimmedStudent,
       memberId: null, 
       score: 0,
       isPassed: false,
       isSubmitted: false,
-      randomQuestions: randomQuestions // 💡 변경됨 (지각생은 여기서 문제 채워짐)
+      randomQuestions: randomQuestions 
     });
 
-    // 2. Socket.io를 통해 관리자 화면으로 실시간 데이터 전송
     const io = req.app.get('io');
     if (io) {
       io.emit('new_student', {
@@ -834,6 +890,109 @@ router.patch("/:id/close", checkLevel, async (req: Request, res: Response) => {
   } catch (error) {
     console.error("시험 종료 에러:", error);
     return res.status(500).json({ ok: false, message: "시험 종료 중 서버 오류가 발생했습니다." });
+  }
+});
+
+
+
+/**
+ * [추가] 정답지(리뷰) 데이터 상세 조회 API (수강생 & 관리자 겸용)
+ */
+router.get("/session/:sessionId/review", async (req: Request, res: Response) => {
+  try {
+    const sessionId = Number(req.params.sessionId);
+    const session = await ExamSession.findByPk(sessionId);
+    
+    if (!session) return res.status(404).json({ ok: false, message: "세션을 찾을 수 없습니다." });
+    
+    // 💡 부정행위 방지: 제출이 안 끝났으면 정답(correctAnswer)을 절대 안 내려줌!
+    if (!session.isSubmitted) return res.status(400).json({ ok: false, message: "제출이 완료되지 않은 시험은 정답을 확인할 수 없습니다." });
+
+    let questions: any[] = [];
+    if (session.randomQuestions && Array.isArray(session.randomQuestions)) {
+      questions = await Question.findAll({
+        where: { id: session.randomQuestions },
+        attributes: ['id', 'content', 'options', 'correctAnswer'], // 💡 여기엔 정답 포함!
+        raw: true
+      });
+      // 원래 출제됐던 순서대로 정렬 복구
+      questions.sort((a, b) => session.randomQuestions.indexOf(a.id) - session.randomQuestions.indexOf(b.id));
+    }
+
+    const savedAnswers = await UserAnswer.findAll({
+      where: { sessionId },
+      attributes: ['questionId', 'submittedAnswer', 'isCorrect'],
+      raw: true
+    });
+
+    return res.status(200).json({
+      ok: true,
+      data: { session, questions, savedAnswers }
+    });
+  } catch (error) {
+    console.error("정답지 로드 에러:", error);
+    return res.status(500).json({ ok: false, message: "정답지 데이터를 불러오는 중 오류가 발생했습니다." });
+  }
+});
+
+/**
+ * [추가] 관리자용 답안 강제 수정 및 자동 재채점 API
+ */
+router.patch("/session/:sessionId/admin-override", checkLevel, async (req: Request, res: Response) => {
+  const tx = await sequelize.transaction();
+  try {
+    const sessionId = Number(req.params.sessionId);
+    const { questionId, submittedAnswer } = req.body;
+
+    // 1. 세션 및 시험 정보 조회
+    const session = await ExamSession.findByPk(sessionId, { transaction: tx });
+    if (!session) {
+      await tx.rollback();
+      return res.status(404).json({ ok: false, message: "세션을 찾을 수 없습니다." });
+    }
+
+    const exam = await CertificationExam.findByPk(session.examId, { transaction: tx });
+    if (!exam) {
+      await tx.rollback();
+      return res.status(404).json({ ok: false, message: "시험 정보를 찾을 수 없습니다." });
+    }
+
+    // 2. 문제 정답 대조
+    const question = await Question.findByPk(questionId, { transaction: tx });
+    if (!question) {
+      await tx.rollback();
+      return res.status(404).json({ ok: false, message: "문제를 찾을 수 없습니다." });
+    }
+
+    const isCorrect = question.correctAnswer.trim() === submittedAnswer.trim();
+
+    // 3. UserAnswer 업데이트 (또는 생성)
+    const existingAnswer = await UserAnswer.findOne({ where: { sessionId, questionId }, transaction: tx });
+    if (existingAnswer) {
+      await existingAnswer.update({ submittedAnswer, isCorrect }, { transaction: tx });
+    } else {
+      await UserAnswer.create({ sessionId, questionId, submittedAnswer, isCorrect }, { transaction: tx });
+    }
+
+    // 4. 점수 재채점 및 합격 여부 갱신
+    const correctCount = await UserAnswer.count({ where: { sessionId, isCorrect: true }, transaction: tx });
+    const score = Math.round((correctCount / exam.questionCount) * 100);
+    const isPassed = score >= exam.passingScore;
+
+    await session.update({ score, isPassed }, { transaction: tx });
+    await tx.commit();
+
+    // 🔥 5. Socket.io 알림 발송 (결과 현황판 실시간 갱신용)
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('student_submitted', { examId: exam.id, sessionId: session.id });
+    }
+
+    return res.status(200).json({ ok: true, message: "답안이 수정되고 점수가 재채점되었습니다." });
+  } catch (error) {
+    if (tx) await tx.rollback();
+    console.error("관리자 답안 강제 수정 에러:", error);
+    return res.status(500).json({ ok: false, message: "답안 수정 중 서버 오류가 발생했습니다." });
   }
 });
 export default router;

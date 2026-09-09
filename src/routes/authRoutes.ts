@@ -302,7 +302,7 @@ router.post('/find-password', async (req: Request, res: Response) => {
     });
 
     // 메일 내용 구성 (보내는 사람에 브랜드명 포함)
-    const clientUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const clientUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
     const resetLink = `${clientUrl}/reset-password?token=${resetToken}`;
 
     const mailOptions = {

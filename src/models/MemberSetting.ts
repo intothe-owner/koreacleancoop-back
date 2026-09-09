@@ -49,6 +49,22 @@ MemberSetting.init({
   useGoogleLogin: { type: DataTypes.BOOLEAN, defaultValue: false, comment: '구글 로그인 활성화 여부' },
   googleClientId: { type: DataTypes.STRING, comment: '구글 Client ID' },
   googleClientSecret: { type: DataTypes.STRING, comment: '구글 Client Secret' },
+  useFindIdPwViaEmail: { 
+    type: DataTypes.BOOLEAN, 
+    defaultValue: true, 
+    comment: '이메일로 아이디 찾기 및 비밀번호 재설정 사용 여부' 
+  },
+  // 💡 [신규 추가] 아이디 찾기 기준 필드
+  findIdMethod: { 
+    type: DataTypes.ENUM('PHONE', 'DOB'), 
+    defaultValue: 'PHONE', 
+    comment: '아이디 찾기 허용 기준 (PHONE: 이름+휴대폰, DOB: 이름+생년월일)' 
+  },
+  smtpHost: { type: DataTypes.STRING, comment: 'SMTP 호스트 주소 (예: smtp.naver.com)' },
+  smtpPort: { type: DataTypes.INTEGER, defaultValue: 465, comment: 'SMTP 포트 (보통 465 또는 587)' },
+  smtpUser: { type: DataTypes.STRING, comment: 'SMTP 발송 계정 아이디' },
+  smtpPassword: { type: DataTypes.STRING, comment: 'SMTP 발송 계정 비밀번호 (또는 앱 비밀번호)' },
+  smtpSecure: { type: DataTypes.BOOLEAN, defaultValue: true, comment: 'SSL/TLS 보안 연결 사용 여부' },
 }, { 
   sequelize, 
   tableName: 'member_settings',

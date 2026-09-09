@@ -30,6 +30,13 @@ router.get('/', async (req: Request, res: Response) => {
         useKakaoLogin: false,
         useNaverLogin: false,
         useGoogleLogin: false,
+        useFindIdPwViaEmail: true,
+        findIdMethod: 'PHONE',
+        smtpHost: '',
+        smtpPort: 465,
+        smtpUser: '',
+        smtpPassword: '',
+        smtpSecure: true,
       }
     });
 

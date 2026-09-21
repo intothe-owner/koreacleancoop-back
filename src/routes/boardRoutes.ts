@@ -527,4 +527,38 @@ router.get('/:boardId/latest-by-category', async (req: Request, res: Response) =
     res.status(500).json({ success: false, message: '서버 오류' });
   }
 });
+
+// ==========================================
+// 1-1.6 단일 카테고리 최신글 N개 조회 (CMS 시공사례 갤러리용)
+// ==========================================
+router.get('/:boardId/latest-category-posts', async (req: Request, res: Response) => {
+  try {
+    const boardIdParam = req.params.boardId as string; 
+    const boardConfig = await findBoardConfig(boardIdParam);
+    
+    if (!boardConfig) {
+      return res.status(404).json({ success: false, message: '게시판 설정을 찾을 수 없습니다.' });
+    }
+    
+    const configId = boardConfig.get('id') as number; 
+    const category = req.query.category as string;
+    const limit = Number(req.query.limit) || 6; // 기본 6개
+
+    if (!category) {
+      return res.status(400).json({ success: false, message: '카테고리 값이 필요합니다.' });
+    }
+
+    const posts = await Post.findAll({
+      where: { boardConfigId: configId, category: category },
+      order: [['createdAt', 'DESC']],
+      limit: limit,
+      attributes: ['id', 'title', 'category', 'thumbnailUrl', 'mediaUrls', 'createdAt']
+    });
+
+    res.status(200).json({ success: true, data: posts });
+  } catch (error) {
+    console.error('단일 카테고리 최신글 조회 오류:', error);
+    res.status(500).json({ success: false, message: '서버 오류' });
+  }
+});
 export default router; 

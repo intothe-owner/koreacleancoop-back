@@ -487,4 +487,44 @@ router.delete('/comments/:commentId', checkLevel, async (req: Request, res: Resp
     res.status(500).json({ success: false, message: '서버 오류' });
   }
 });
+
+// ==========================================
+// 1-1.5 카테고리별 최신글 1개씩 조회 (시공사례 갤러리용)
+// ==========================================
+router.get('/:boardId/latest-by-category', async (req: Request, res: Response) => {
+  try {
+    const boardIdParam = req.params.boardId as string; 
+    const boardConfig = await findBoardConfig(boardIdParam);
+    
+    if (!boardConfig) {
+      return res.status(404).json({ success: false, message: '게시판 설정을 찾을 수 없습니다.' });
+    }
+    
+    const configId = boardConfig.get('id') as number; 
+    // 가져올 카테고리 목록
+    const targetCategories = [
+      '건물위생관리', '냉난방기종합세척', '소독방역', 
+      '공공시설청소', '경로당토탈케어', '청소교육'
+    ];
+
+    // 각 카테고리별로 최신글 1개씩 병렬 조회 (Promise.all 활용)
+    const promises = targetCategories.map(category => 
+      Post.findOne({
+        where: { boardConfigId: configId, category: category },
+        order: [['createdAt', 'DESC']],
+        attributes: ['id', 'title', 'category', 'thumbnailUrl', 'mediaUrls', 'createdAt'] // 필요한 필드만 최소한으로 로드
+      })
+    );
+
+    const posts = await Promise.all(promises);
+    
+    // null(작성된 글이 없는 카테고리)을 제외하고 응답
+    const validPosts = posts.filter(post => post !== null);
+
+    res.status(200).json({ success: true, data: validPosts });
+  } catch (error) {
+    console.error('카테고리별 최신글 조회 오류:', error);
+    res.status(500).json({ success: false, message: '서버 오류' });
+  }
+});
 export default router; 

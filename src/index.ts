@@ -19,6 +19,9 @@ import memberRoutes from './routes/memberRoutes';
 import certificationRoutes from './routes/certificationRoutes';
 import coopMemberRoutes from './routes/coopMemberRoutes';
 import qualificationsRouter from './routes/qualificationsRoutes';
+import customerRoutes from './routes/customerRoutes';
+import socialContributionRoutes from './routes/socialContributionRoutes';
+
 import path from 'path';
 
 dotenv.config();
@@ -79,6 +82,8 @@ app.use('/api/members', memberRoutes);
 app.use('/api/certifications', certificationRoutes);
 app.use('/api', coopMemberRoutes);
 app.use('/api/qualifications', qualificationsRouter);
+app.use('/api', customerRoutes); 
+app.use('/api/social-contributions', socialContributionRoutes);
 
 const syncOptions = process.env.NODE_ENV === 'production' ? {} : { alter: true };
 

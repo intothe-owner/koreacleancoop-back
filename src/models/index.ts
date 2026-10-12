@@ -15,6 +15,9 @@ import { CertificationExam } from './CertificationExam';
 import { Question } from './Question';
 import { ExamSession } from './ExamSession';
 import { UserAnswer } from './UserAnswer';
+import { Achievement } from './Achievement';
+import { Customer } from './Customer';
+import { SocialContribution } from "./SocialContribution";
 
 // --- 테이블 간의 관계(Relation) 정의 ---
 
@@ -74,5 +77,8 @@ export {
     VisitorLog,
     Policy, 
     Certification,
-    CoopMember
+    CoopMember,
+    Achievement,
+    Customer,
+    SocialContribution
 };

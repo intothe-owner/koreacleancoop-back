@@ -22,7 +22,11 @@ router.post('/register', uploadAny.single('approvalFile'), async (req: Request, 
       nickname,
       phone,
       mobile,
+      postcode,        // ✨ 추가: 우편번호
       address,
+      address_detail,  // ✨ 추가: 상세주소
+      latitude,        // ✨ 추가: 위도
+      longitude,       // ✨ 추가: 경도
       dob,
       companyName,
       isApp // ⭐ 프론트에서 보낸 명시적 플래그 받기
@@ -56,7 +60,6 @@ router.post('/register', uploadAny.single('approvalFile'), async (req: Request, 
         }
       }
     }
-    // 일반회원(NORMAL)인 경우는 if문을 타지 않아 무조건 레벨 1이 유지됩니다.
 
     // 파일이 업로드된 경우 URL 추출
     let approvalFileUrl = '';
@@ -74,10 +77,14 @@ router.post('/register', uploadAny.single('approvalFile'), async (req: Request, 
       nickname,
       phone,
       mobile,
+      postcode,                                           // ✨ 적용
       address,
+      address_detail,                                     // ✨ 적용
+      latitude: latitude ? parseFloat(latitude) : null,   // ✨ 적용: 문자열로 온 좌표를 숫자로 변환
+      longitude: longitude ? parseFloat(longitude) : null,// ✨ 적용
       dob,
       companyName,
-      level: finalLevel, // ✨ 분기 처리된 레벨 적용
+      level: finalLevel,
       snsProvider: 'LOCAL',
       approvalFileUrl
     });
@@ -115,8 +122,6 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     const memberId = user.getDataValue('id');
-
-   
 
     const token = jwt.sign(
       { 
@@ -203,7 +208,6 @@ router.post('/token', async (req: Request, res: Response) => {
     if (!memberId) {
       return res.status(400).json({ success: false, message: '회원 ID가 필요합니다.' });
     }
-
 
     res.status(200).json({ success: true, message: '푸시 토큰이 등록되었습니다.' });
   } catch (error) {
@@ -337,6 +341,7 @@ router.post('/find-password', async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: '서버 오류로 인해 메일 발송에 실패했습니다.' });
   }
 });
+
 // 7. 실제 비밀번호 변경 (토큰 검증) API
 router.put('/reset-password', async (req: Request, res: Response) => {
   try {
@@ -377,4 +382,5 @@ router.put('/reset-password', async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: '서버 오류가 발생했습니다.' });
   }
 });
+
 export default router;

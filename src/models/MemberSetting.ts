@@ -17,6 +17,7 @@ MemberSetting.init({
   usePhone: { type: DataTypes.BOOLEAN, defaultValue: false, comment: '전화번호 사용여부' },
   useMobile: { type: DataTypes.BOOLEAN, defaultValue: true, comment: '휴대폰번호 사용여부' },
   useAddress: { type: DataTypes.BOOLEAN, defaultValue: false, comment: '주소 사용여부' },
+  useLocation: { type: DataTypes.BOOLEAN, defaultValue: false, comment: '지도 위치(좌표) 저장 사용여부' }, // ✨ 신규 추가
   useDob: { type: DataTypes.BOOLEAN, defaultValue: false, comment: '생년월일 사용여부' },
 
   // --- 💡 [신규 추가] 가입 승인 제도 설정 ---

@@ -16,6 +16,9 @@ router.get('/', async (req: Request, res: Response) => {
         useName: true,
         useNickname: true,
         useMobile: true,
+        useAddress: false,
+        useLocation: false, // ✨ 신규 추가
+        useDob: false,
         useTermsOfService: true,
         usePrivacyPolicy: true,
         useApproval: false,

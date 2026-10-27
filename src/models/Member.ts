@@ -16,7 +16,6 @@ Member.init({
     allowNull: true, 
     comment: '조합원회원 기업명' 
   },
-
   loginId: { type: DataTypes.STRING, unique: false, allowNull: false },
   password: { type: DataTypes.STRING, allowNull: false },
   name: { type: DataTypes.STRING, allowNull: false },
@@ -26,6 +25,8 @@ Member.init({
   postcode:{type: DataTypes.STRING},
   address: { type: DataTypes.STRING },
   address_detail: { type: DataTypes.STRING },
+  latitude: { type: DataTypes.DECIMAL(10, 7), comment: '위도' },
+  longitude: { type: DataTypes.DECIMAL(10, 7), comment: '경도' },
   dob: { type: DataTypes.DATEONLY },
   level: { type: DataTypes.INTEGER, defaultValue: 1, comment: '회원 권한 레벨' },
   snsProvider: { 

@@ -19,7 +19,7 @@ router.get('/', checkLevel, async (req: Request, res: Response) => {
 
     const searchType = req.query.searchType as string;
     const keyword = req.query.keyword as string;
-    const levelFilter = req.query.level as string; // ✨ 레벨 필터 수신
+    const levelFilter = req.query.level as string; 
 
     const where: any = {};
     
@@ -31,7 +31,6 @@ router.get('/', checkLevel, async (req: Request, res: Response) => {
       }
     }
 
-    // ✨ 특정 레벨 필터 적용 (예: 승인 대기 회원 조회 시 '0' 전달)
     if (levelFilter !== undefined && levelFilter !== "") {
       where.level = Number(levelFilter);
     }
@@ -64,7 +63,9 @@ router.get('/', checkLevel, async (req: Request, res: Response) => {
 router.put('/:id', checkLevel, async (req: Request, res: Response) => {
   try {
     const targetId = Number(req.params.id);
-    const { name, nickname, phone, mobile,postcode, address,address_detail, level, password } = req.body;
+    
+    // ✨ latitude, longitude 파라미터 추가 수신
+    const { name, nickname, phone, mobile, postcode, address, address_detail, latitude, longitude, level, password } = req.body;
 
     // 권한 검증: 수정 대상이 '나' 자신이거나, 내 레벨이 9(관리자) 이상인지 확인
     if (req.user.id !== targetId && req.user.level < 9) {
@@ -80,7 +81,10 @@ router.put('/:id', checkLevel, async (req: Request, res: Response) => {
     if (postcode) updateData.postcode = postcode;
     if (address) updateData.address = address;
     if (address_detail) updateData.address_detail = address_detail;
-
+    
+    // ✨ 좌표값이 있을 경우 저장
+    if (latitude) updateData.latitude = latitude;
+    if (longitude) updateData.longitude = longitude;
 
     // 💡 회원의 권한(Level) 등급 변경은 '관리자(Level >= 9)'만 가능하도록 통제
     if (level !== undefined && req.user.level >= 9) {
@@ -108,7 +112,6 @@ router.put('/:id', checkLevel, async (req: Request, res: Response) => {
 // 3. 회원 삭제 (관리자 전용)
 router.delete('/:id', checkLevel, async (req: Request, res: Response) => {
   try {
-    // 관리자(Level 9 이상)만 회원 삭제 가능
     if (req.user.level < 9) {
       return res.status(403).json({ success: false, message: '회원을 삭제할 권한이 없습니다.' });
     }
@@ -120,7 +123,6 @@ router.delete('/:id', checkLevel, async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, message: '삭제할 회원을 찾을 수 없습니다.' });
     }
 
-    // 💡 최고관리자(Level 10) 계정은 실수로 삭제되지 않도록 보호
     if (member.getDataValue('level') === 10) {
        return res.status(403).json({ success: false, message: '최고관리자 계정은 삭제할 수 없습니다.' });
     }
@@ -132,6 +134,8 @@ router.delete('/:id', checkLevel, async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: '서버 오류' });
   }
 });
+
+// 4. 회원 승인
 router.patch('/:id/approve', checkLevel, async (req: Request, res: Response) => {
   try {
     if (req.user.level < 9) {
@@ -145,11 +149,9 @@ router.patch('/:id/approve', checkLevel, async (req: Request, res: Response) => 
       return res.status(404).json({ success: false, message: '회원을 찾을 수 없습니다.' });
     }
 
-    // 💡 환경설정에서 신규 가입 시 부여되는 기본 등급(defaultLevel)을 조회
     const setting = await MemberSetting.findByPk(1);
     const defaultLvl = setting ? setting.getDataValue('defaultLevel') : 1;
 
-    // 해당 회원 레벨을 기본 가입 권한으로 상향
     await member.update({ level: defaultLvl });
 
     res.status(200).json({ success: true, message: '정상적으로 승인되었습니다.' });

@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { Op, fn, col } from 'sequelize';
+import { Op, literal } from 'sequelize';
 import { sequelize } from '../config/database';
 import { QuoteRequest, QuoteMatch, Member } from '../models';
 
@@ -21,29 +21,36 @@ const MATCH_RANGES = [
 router.post('/', async (req: Request, res: Response) => {
   const t = await sequelize.transaction();
   try {
-    const { customerName, customerPhone, address,addressDetail, latitude, longitude, serviceType, details, preferredDate } = req.body;
+    const { customerName, customerPhone, address, addressDetail, latitude, longitude, serviceType, details, preferredDate } = req.body;
 
-    const location = { type: 'Point', coordinates: [longitude, latitude] };
+    // QuoteRequest에는 location POINT 객체 생성 삽입
+    const location = literal(`ST_GeomFromText('POINT(${longitude} ${latitude})')`);
 
     const newQuote = (await QuoteRequest.create({
-      customerName, customerPhone, address,addressDetail, latitude, longitude, location,
+      customerName, customerPhone, address, addressDetail, latitude, longitude, location,
       serviceType, details, preferredDate, currentMatchStage: 0, status: 'MATCHING'
     }, { transaction: t })) as any;
 
     const range = MATCH_RANGES[0];
-    const pointQuery = fn('ST_GeomFromText', `POINT(${longitude} ${latitude})`);
-    const distanceCol = fn('ST_Distance_Sphere', col('location'), pointQuery);
+
+    // 🌟 핵심 수정: Member 테이블의 longitude, latitude(DECIMAL)를 MySQL POINT 함수로 묶어서 거리 계산
+    const distanceQuery = literal(`ST_Distance_Sphere(POINT(\`Member\`.\`longitude\`, \`Member\`.\`latitude\`), ST_GeomFromText('POINT(${longitude} ${latitude})'))`);
 
     const nearbyMembers = await Member.findAll({
-      attributes: ['id', [distanceCol, 'distanceInMeters']],
-      where: sequelize.where(distanceCol, { [Op.between]: [range.min, range.max] }),
+      attributes: ['id', [distanceQuery, 'distanceInMeters']],
+      where: {
+        // 위경도가 등록된 업체만 대상으로 설정 (NULL 에러 방지)
+        latitude: { [Op.not]: null },
+        longitude: { [Op.not]: null },
+        [Op.and]: sequelize.where(distanceQuery, { [Op.between]: [range.min, range.max] })
+      },
       transaction: t
     });
 
     const matchData = nearbyMembers.map((member: any) => ({
       quoteRequestId: newQuote.id,
       memberId: member.id,
-      distance: (member.getDataValue('distanceInMeters') / 1000).toFixed(2),
+      distance: (member.getDataValue('distanceInMeters') / 1000).toFixed(2), // 미터를 km로 변환
       matchStage: 0,
       status: 'WAITING'
     }));
@@ -61,7 +68,6 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-
 // ==========================================
 // 2. 견적문의 목록 조회 (페이징 및 필터링)
 // ==========================================
@@ -73,7 +79,6 @@ router.get('/', async (req: Request, res: Response) => {
 
     const { serviceType, status } = req.query;
     
-    // 검색 조건 조립
     const whereClause: any = {};
     if (serviceType) whereClause.serviceType = serviceType;
     if (status) whereClause.status = status;
@@ -83,7 +88,7 @@ router.get('/', async (req: Request, res: Response) => {
       order: [['createdAt', 'DESC']],
       limit,
       offset,
-      attributes: { exclude: ['location'] } // POINT 객체는 제외하고 위경도만 반환
+      attributes: { exclude: ['location'] } // GEOMETRY 제외
     });
 
     res.json({
@@ -102,7 +107,6 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
-
 // ==========================================
 // 3. 견적문의 상세 보기 (매칭된 업체 내역 포함)
 // ==========================================
@@ -120,8 +124,7 @@ router.get('/:id', async (req: Request, res: Response) => {
             {
               model: Member,
               as: 'member',
-              // 업체 정보 중 필요한 것만 가져오기 (비밀번호 등 제외)
-              attributes: ['id', 'username', 'name', 'phone'] 
+              attributes: ['id', 'companyName', 'name', 'phone'] // 기업명 추가
             }
           ]
         }
@@ -139,12 +142,10 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
-
 // ==========================================
 // 4. 반경 확장 매칭 실행 (수동 또는 스케줄러용)
 // ==========================================
 router.post('/:id/expand-match', async (req: Request, res: Response) => {
-  // (이전 답변에서 제공한 코드와 동일하므로 생략 없이 파일에 포함하시면 됩니다)
   try {
     const quoteId = req.params.id;
     const quote = (await QuoteRequest.findByPk(Number(quoteId))) as any;
@@ -159,8 +160,9 @@ router.post('/:id/expand-match', async (req: Request, res: Response) => {
     }
 
     const range = MATCH_RANGES[nextStage];
-    const pointQuery = fn('ST_GeomFromText', `POINT(${quote.longitude} ${quote.latitude})`);
-    const distanceCol = fn('ST_Distance_Sphere', col('location'), pointQuery);
+    
+    // 🌟 확장 매칭에서도 Member.longitude와 Member.latitude를 사용하도록 수정
+    const distanceQuery = literal(`ST_Distance_Sphere(POINT(\`Member\`.\`longitude\`, \`Member\`.\`latitude\`), ST_GeomFromText('POINT(${quote.longitude} ${quote.latitude})'))`);
 
     const existingMatches = await QuoteMatch.findAll({ 
       where: { quoteRequestId: quote.id }, 
@@ -169,10 +171,12 @@ router.post('/:id/expand-match', async (req: Request, res: Response) => {
     const excludeIds = existingMatches.map((m: any) => m.memberId);
 
     const newMembers = await Member.findAll({
-      attributes: ['id', [distanceCol, 'distanceInMeters']],
+      attributes: ['id', [distanceQuery, 'distanceInMeters']],
       where: {
+        latitude: { [Op.not]: null }, // 위경도 값이 있는 회원만 조회
+        longitude: { [Op.not]: null },
         id: { [Op.notIn]: excludeIds },
-        [Op.and]: sequelize.where(distanceCol, { [Op.between]: [range.min, range.max] })
+        [Op.and]: sequelize.where(distanceQuery, { [Op.between]: [range.min, range.max] })
       }
     });
 

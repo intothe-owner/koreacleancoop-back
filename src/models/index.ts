@@ -18,6 +18,8 @@ import { UserAnswer } from './UserAnswer';
 import { Achievement } from './Achievement';
 import { Customer } from './Customer';
 import { SocialContribution } from "./SocialContribution";
+import { QuoteRequest } from './QuoteRequest';
+import { QuoteMatch } from './QuoteMatch';
 
 // --- 테이블 간의 관계(Relation) 정의 ---
 
@@ -65,6 +67,23 @@ UserAnswer.belongsTo(ExamSession, { foreignKey: 'sessionId', as: 'session' });
 // 5. 문제(1) - 사용자답안(N) : 한 문제가 여러 수강생의 답안과 매칭됨
 Question.hasMany(UserAnswer, { foreignKey: 'questionId' });
 UserAnswer.belongsTo(Question, { foreignKey: 'questionId', as: 'questionInfo' });
+
+
+// --- 견적 문의 및 업체 매칭 관계(Relation) 정의 ---
+
+// 1. 견적요청(1) - 매칭내역(N) : 하나의 견적 요청에 여러 업체의 매칭/입찰 기록이 생성됨 (견적 삭제 시 매칭 내역도 삭제)
+QuoteRequest.hasMany(QuoteMatch, { foreignKey: 'quoteRequestId', as: 'matches', onDelete: 'CASCADE' });
+QuoteMatch.belongsTo(QuoteRequest, { foreignKey: 'quoteRequestId', as: 'quoteRequest' });
+
+// 2. 회원[업체](1) - 매칭내역(N) : 한 업체(회원)는 여러 견적 매칭 알림 및 제안을 받을 수 있음 (회원 삭제 시 매칭 내역도 삭제)
+Member.hasMany(QuoteMatch, { foreignKey: 'memberId', as: 'quoteMatches', onDelete: 'CASCADE' });
+QuoteMatch.belongsTo(Member, { foreignKey: 'memberId', as: 'member' });
+
+// 3. 회원[업체](1) - 견적요청(N) : 최종적으로 매칭이 성사된 업체와 견적 요청의 관계
+Member.hasMany(QuoteRequest, { foreignKey: 'matchedMemberId', as: 'matchedRequests' });
+QuoteRequest.belongsTo(Member, { foreignKey: 'matchedMemberId', as: 'matchedMember' });
+
+
 export { 
     Menu, 
     Page, 
@@ -80,5 +99,7 @@ export {
     CoopMember,
     Achievement,
     Customer,
-    SocialContribution
+    SocialContribution,
+    QuoteRequest,
+    QuoteMatch
 };

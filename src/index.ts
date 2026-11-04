@@ -21,6 +21,7 @@ import coopMemberRoutes from './routes/coopMemberRoutes';
 import qualificationsRouter from './routes/qualificationsRoutes';
 import customerRoutes from './routes/customerRoutes';
 import socialContributionRoutes from './routes/socialContributionRoutes';
+import quoteRoutes from './routes/quoteRoutes';
 
 import path from 'path';
 
@@ -84,7 +85,7 @@ app.use('/api', coopMemberRoutes);
 app.use('/api/qualifications', qualificationsRouter);
 app.use('/api', customerRoutes); 
 app.use('/api/social-contributions', socialContributionRoutes);
-
+app.use('/api/quotes', quoteRoutes);
 const syncOptions = process.env.NODE_ENV === 'production' ? {} : { alter: true };
 
 // DB 동기화 및 서버 실행 (app.listen 대신 server.listen 사용)

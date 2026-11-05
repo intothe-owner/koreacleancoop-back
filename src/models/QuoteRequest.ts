@@ -73,7 +73,10 @@ QuoteRequest.init({
     type: DataTypes.INTEGER, 
     allowNull: true, 
     comment: '최종 매칭된 업체(Member) ID' 
-  }
+  },
+  reviewRating: { type: DataTypes.INTEGER, allowNull: true, comment: '고객 리뷰 평점 (1~5)' },
+  reviewContent: { type: DataTypes.TEXT, allowNull: true, comment: '고객 리뷰 내용' },
+  reviewReply: { type: DataTypes.TEXT, allowNull: true, comment: '업체 답글 내용' },
 }, { 
   sequelize, 
   tableName: 'quote_requests',

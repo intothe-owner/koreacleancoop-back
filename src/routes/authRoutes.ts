@@ -8,7 +8,7 @@ import nodemailer from 'nodemailer';
 import { checkLevel } from '../middlewares/authMiddleware';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET||'userLogin';
+const JWT_SECRET = process.env.JWT_SECRET || 'userLogin';
 
 // 1. 회원가입 API (파일 업로드 적용 및 레벨 분기 처리)
 router.post('/register', uploadAny.single('approvalFile'), async (req: Request, res: Response) => {
@@ -22,33 +22,28 @@ router.post('/register', uploadAny.single('approvalFile'), async (req: Request, 
       nickname,
       phone,
       mobile,
-      postcode,        // ✨ 추가: 우편번호
+      postcode,        
       address,
-      address_detail,  // ✨ 추가: 상세주소
-      latitude,        // ✨ 추가: 위도
-      longitude,       // ✨ 추가: 경도
+      address_detail,  
+      latitude,        
+      longitude,       
       dob,
       companyName,
-      isApp // ⭐ 프론트에서 보낸 명시적 플래그 받기
+      isApp 
     } = req.body;
 
-    // 아이디 중복 체크
     const existingUser = await Member.findOne({ where: { loginId } });
     if (existingUser) {
       return res.status(400).json({ success: false, message: '이미 사용 중인 아이디(이메일)입니다.' });
     }
 
-    // 비밀번호 암호화 (Salt 10)
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // ✨ 일반/조합원 구분에 따른 레벨 부여 로직
-    let finalLevel = 1; // 일반회원(NORMAL) 기본 레벨 1
+    let finalLevel = 1; 
 
     if (isApp === 'true' || isApp === true) {
-      // 💡 앱에서 가입한 경우 무조건 최고관리자 레벨 10 부여
       finalLevel = 10;
     } else {
-      // 기존 웹 가입 로직 유지
       if (memberType === 'UNION') {
         const setting = await MemberSetting.findByPk(1);
         const useApproval = setting ? setting.getDataValue('useApproval') : false;
@@ -61,13 +56,11 @@ router.post('/register', uploadAny.single('approvalFile'), async (req: Request, 
       }
     }
 
-    // 파일이 업로드된 경우 URL 추출
     let approvalFileUrl = '';
     if (req.file) {
       approvalFileUrl = (req.file as any).location || req.file.path;
     }
 
-    // 회원 생성
     const newMember = await Member.create({
       memberType: memberType || 'NORMAL',
       loginId,
@@ -77,11 +70,11 @@ router.post('/register', uploadAny.single('approvalFile'), async (req: Request, 
       nickname,
       phone,
       mobile,
-      postcode,                                           // ✨ 적용
+      postcode,                                                   
       address,
-      address_detail,                                     // ✨ 적용
-      latitude: latitude ? parseFloat(latitude) : null,   // ✨ 적용: 문자열로 온 좌표를 숫자로 변환
-      longitude: longitude ? parseFloat(longitude) : null,// ✨ 적용
+      address_detail,                                             
+      latitude: latitude ? parseFloat(latitude) : null,   
+      longitude: longitude ? parseFloat(longitude) : null,
       dob,
       companyName,
       level: finalLevel,
@@ -96,10 +89,9 @@ router.post('/register', uploadAny.single('approvalFile'), async (req: Request, 
   }
 });
 
-// 2. 로그인 API (기존 유지: 레벨이 승인 대기 레벨(0)인 경우만 차단)
+// 2. 로그인 API
 router.post('/login', async (req: Request, res: Response) => {
   try {
-    // 💡 프론트엔드에서 로그인 시 fcm 토큰과 기기 ID도 같이 받습니다.
     const { loginId, password } = req.body;
     console.log(req.body);
 
@@ -151,7 +143,80 @@ router.post('/login', async (req: Request, res: Response) => {
   }
 });
 
-// 3. 최고관리자(Level 10) 존재 여부 확인 API
+// ✨ 3. 내 정보 불러오기 API (/api/auth/info)
+router.get('/info', checkLevel, async (req: Request, res: Response) => {
+  try {
+    const memberId = req.user.id; 
+
+    const user = await Member.findByPk(memberId, {
+      attributes: { exclude: ['password'] } 
+    });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: '회원 정보를 찾을 수 없습니다.' });
+    }
+
+    res.status(200).json({ success: true, data: user });
+  } catch (error) {
+    console.error('내 정보 조회 오류:', error);
+    res.status(500).json({ success: false, message: '서버 오류가 발생했습니다.' });
+  }
+});
+
+// ✨ 4. 내 정보 수정하기 API (/api/auth/update)
+router.put('/update', checkLevel, uploadAny.single('approvalFile'), async (req: Request, res: Response) => {
+  try {
+    const memberId = req.user.id; 
+    
+    const {
+      password,
+      name,
+      nickname,
+      phone,
+      mobile,
+      postcode,
+      address,
+      address_detail,
+      latitude,
+      longitude,
+      companyName
+    } = req.body;
+
+    const updateData: any = {};
+    
+    if (name) updateData.name = name;
+    if (nickname) updateData.nickname = nickname;
+    if (phone) updateData.phone = phone;
+    if (mobile) updateData.mobile = mobile;
+    if (postcode) updateData.postcode = postcode;
+    if (address) updateData.address = address;
+    if (address_detail) updateData.address_detail = address_detail;
+    if (latitude) updateData.latitude = parseFloat(latitude);
+    if (longitude) updateData.longitude = parseFloat(longitude);
+    if (companyName) updateData.companyName = companyName;
+
+    if (req.file) {
+      updateData.approvalFileUrl = (req.file as any).location || req.file.path;
+    }
+
+    if (password) {
+      updateData.password = await bcrypt.hash(password, 10);
+    }
+
+    const [updatedRows] = await Member.update(updateData, { where: { id: memberId } });
+    
+    if (updatedRows === 0) {
+      return res.status(400).json({ success: false, message: '변경된 내용이 없거나 회원을 찾을 수 없습니다.' });
+    }
+
+    res.status(200).json({ success: true, message: '회원 정보가 성공적으로 수정되었습니다.' });
+  } catch (error) {
+    console.error('내 정보 수정 오류:', error);
+    res.status(500).json({ success: false, message: '서버 오류가 발생했습니다.' });
+  }
+});
+
+// 5. 최고관리자(Level 10) 존재 여부 확인 API
 router.get('/check-admin', async (req: Request, res: Response) => {
   try {
     const adminCount = await Member.count({ where: { level: 10 } });
@@ -163,7 +228,7 @@ router.get('/check-admin', async (req: Request, res: Response) => {
   }
 });
 
-// 4. 최초 최고관리자 생성 API (Bootstrapping)
+// 6. 최초 최고관리자 생성 API (Bootstrapping)
 router.post('/setup-admin', async (req: Request, res: Response) => {
   try {
     const adminCount = await Member.count({ where: { level: 10 } });
@@ -202,7 +267,6 @@ router.post('/setup-admin', async (req: Request, res: Response) => {
 // 로그인 후 클라이언트가 FCM 토큰을 서버로 전송할 때 호출하는 API
 router.post('/token', async (req: Request, res: Response) => {
   try {
-    // ✨ req.user 대신 req.body에서 memberId를 직접 추출합니다.
     const {  memberId } = req.body;
 
     if (!memberId) {
@@ -216,7 +280,7 @@ router.post('/token', async (req: Request, res: Response) => {
   }
 });
 
-// 5. 아이디(이메일) 찾기 API
+// 8. 아이디(이메일) 찾기 API
 router.post('/find-id', async (req: Request, res: Response) => {
   try {
     const { name, mobile, dob } = req.body;
@@ -242,7 +306,6 @@ router.post('/find-id', async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, message: '입력하신 정보와 일치하는 계정이 없습니다.' });
     }
 
-    // 보안을 위해 이메일 아이디 일부를 마스킹 처리 (예: in***@naver.com)
     const loginId = user.getDataValue('loginId') as string;
     const [idStr, domain] = loginId.split('@');
     let maskedEmail = loginId;
@@ -261,7 +324,7 @@ router.post('/find-id', async (req: Request, res: Response) => {
   }
 });
 
-// 6. 비밀번호 재설정 메일 발송 API
+// 9. 비밀번호 재설정 메일 발송 API
 router.post('/find-password', async (req: Request, res: Response) => {
   try {
     const { loginId, name } = req.body;
@@ -276,7 +339,6 @@ router.post('/find-password', async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, message: '일치하는 계정 정보를 찾을 수 없습니다.' });
     }
 
-    // SMTP 정보 확인
     const smtpHost = setting.getDataValue('smtpHost');
     const smtpPort = setting.getDataValue('smtpPort');
     const smtpUser = setting.getDataValue('smtpUser');
@@ -287,14 +349,12 @@ router.post('/find-password', async (req: Request, res: Response) => {
       return res.status(500).json({ success: false, message: '서버에 메일 발송 설정이 완료되지 않았습니다. 관리자에게 문의하세요.' });
     }
 
-    // 1시간 동안만 유효한 임시 JWT 토큰 생성 (비밀번호 변경 페이지에서 검증용)
     const resetToken = jwt.sign(
       { id: user.getDataValue('id'), type: 'PASSWORD_RESET' },
       JWT_SECRET,
       { expiresIn: '1h' }
     );
 
-    // Nodemailer 트랜스포터 세팅
     const transporter = nodemailer.createTransport({
       host: smtpHost,
       port: smtpPort,
@@ -305,7 +365,6 @@ router.post('/find-password', async (req: Request, res: Response) => {
       },
     });
 
-    // 메일 내용 구성 (보내는 사람에 브랜드명 포함)
     const clientUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
     const resetLink = `${clientUrl}/reset-password?token=${resetToken}`;
 
@@ -342,7 +401,7 @@ router.post('/find-password', async (req: Request, res: Response) => {
   }
 });
 
-// 7. 실제 비밀번호 변경 (토큰 검증) API
+// 10. 실제 비밀번호 변경 (토큰 검증) API
 router.put('/reset-password', async (req: Request, res: Response) => {
   try {
     const { token, newPassword } = req.body;
@@ -351,7 +410,6 @@ router.put('/reset-password', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: '유효하지 않은 요청입니다.' });
     }
 
-    // JWT 토큰 검증
     let decoded: any;
     try {
       decoded = jwt.verify(token, JWT_SECRET);
@@ -359,20 +417,17 @@ router.put('/reset-password', async (req: Request, res: Response) => {
       return res.status(401).json({ success: false, message: '만료되었거나 유효하지 않은 링크입니다. 비밀번호 찾기를 다시 진행해 주세요.' });
     }
 
-    // 토큰 타입 검증 (로그인 토큰과 구분하기 위함)
     if (decoded.type !== 'PASSWORD_RESET') {
       return res.status(401).json({ success: false, message: '잘못된 토큰 형식입니다.' });
     }
 
     const memberId = decoded.id;
 
-    // 회원 존재 여부 확인
     const user = await Member.findByPk(memberId);
     if (!user) {
       return res.status(404).json({ success: false, message: '존재하지 않는 회원입니다.' });
     }
 
-    // 비밀번호 암호화 및 업데이트 (Salt 10)
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     await user.update({ password: hashedPassword });
 

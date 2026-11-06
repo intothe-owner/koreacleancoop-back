@@ -5,7 +5,11 @@ import { checkLevel } from '../middlewares/authMiddleware';
 import { Op } from 'sequelize';
 import { MemberSetting } from '../models';
 
+// ✨ FormData 처리를 위한 upload 미들웨어 임포트 추가
+import { uploadAny } from '../middlewares/uploadAny';
+
 const router = Router();
+
 // 1. 회원 목록 조회 (관리자 전용: Level 9 이상)
 router.get('/', checkLevel, async (req: Request, res: Response) => {
   try {
@@ -59,13 +63,42 @@ router.get('/', checkLevel, async (req: Request, res: Response) => {
   }
 });
 
-// 2. 회원 정보 수정 (본인 또는 관리자)
-router.put('/:id', checkLevel, async (req: Request, res: Response) => {
+// ✨ 2. 단일 회원 상세 조회 (관리자 전용)
+// 프론트엔드의 /admin/member/[id] 에서 이 API를 호출합니다.
+router.get('/:id', checkLevel, async (req: Request, res: Response) => {
+  try {
+    if (req.user.level < 9) {
+      return res.status(403).json({ success: false, message: '회원 정보를 볼 권한이 없습니다.' });
+    }
+
+    const targetId = Number(req.params.id);
+    const member = await Member.findByPk(targetId, {
+      attributes: { exclude: ['password'] } // 보안상 비밀번호는 제외
+    });
+
+    if (!member) {
+      return res.status(404).json({ success: false, message: '회원을 찾을 수 없습니다.' });
+    }
+
+    res.status(200).json({ success: true, data: member });
+  } catch (error) {
+    console.error('회원 상세 조회 오류:', error);
+    res.status(500).json({ success: false, message: '서버 오류' });
+  }
+});
+
+
+// 3. 회원 정보 수정 (본인 또는 관리자)
+// ✨ 관리자 모드 회원 수정에서도 파일 업로드를 받을 수 있도록 uploadAny.single('approvalFile') 추가
+router.put('/:id', checkLevel, uploadAny.single('approvalFile'), async (req: Request, res: Response) => {
   try {
     const targetId = Number(req.params.id);
     
-    // ✨ latitude, longitude 파라미터 추가 수신
-    const { name, nickname, phone, mobile, postcode, address, address_detail, latitude, longitude, level, password } = req.body;
+    // ✨ companyName 파라미터 추가 수신
+    const { 
+      name, nickname, phone, mobile, postcode, address, address_detail, 
+      latitude, longitude, companyName, level, password 
+    } = req.body;
 
     // 권한 검증: 수정 대상이 '나' 자신이거나, 내 레벨이 9(관리자) 이상인지 확인
     if (req.user.id !== targetId && req.user.level < 9) {
@@ -82,16 +115,24 @@ router.put('/:id', checkLevel, async (req: Request, res: Response) => {
     if (address) updateData.address = address;
     if (address_detail) updateData.address_detail = address_detail;
     
-    // ✨ 좌표값이 있을 경우 저장
-    if (latitude) updateData.latitude = latitude;
-    if (longitude) updateData.longitude = longitude;
+    // 좌표값이 있을 경우 저장 (FormData로 오므로 parseFloat 처리)
+    if (latitude) updateData.latitude = parseFloat(latitude);
+    if (longitude) updateData.longitude = parseFloat(longitude);
+    
+    // 기업명 저장
+    if (companyName) updateData.companyName = companyName;
 
-    // 💡 회원의 권한(Level) 등급 변경은 '관리자(Level >= 9)'만 가능하도록 통제
+    // ✨ 파일이 업로드된 경우 URL 추출 및 저장
+    if (req.file) {
+      updateData.approvalFileUrl = (req.file as any).location || req.file.path;
+    }
+
+    // 회원의 권한(Level) 등급 변경은 '관리자(Level >= 9)'만 가능하도록 통제
     if (level !== undefined && req.user.level >= 9) {
       updateData.level = level;
     }
 
-    // 💡 비밀번호 변경을 요청한 경우 새롭게 해싱
+    // 비밀번호 변경을 요청한 경우 새롭게 해싱
     if (password) {
       updateData.password = await bcrypt.hash(password, 10);
     }
@@ -109,7 +150,7 @@ router.put('/:id', checkLevel, async (req: Request, res: Response) => {
   }
 });
 
-// 3. 회원 삭제 (관리자 전용)
+// 4. 회원 삭제 (관리자 전용)
 router.delete('/:id', checkLevel, async (req: Request, res: Response) => {
   try {
     if (req.user.level < 9) {
@@ -135,7 +176,7 @@ router.delete('/:id', checkLevel, async (req: Request, res: Response) => {
   }
 });
 
-// 4. 회원 승인
+// 5. 회원 승인
 router.patch('/:id/approve', checkLevel, async (req: Request, res: Response) => {
   try {
     if (req.user.level < 9) {
@@ -160,4 +201,5 @@ router.patch('/:id/approve', checkLevel, async (req: Request, res: Response) => 
     res.status(500).json({ success: false, message: '서버 오류' });
   }
 });
+
 export default router;

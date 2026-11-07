@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import { Op, literal } from 'sequelize';
 import { sequelize } from '../config/database';
 import { QuoteRequest, QuoteMatch, Member } from '../models';
-import { checkLevel } from '../middlewares/authMiddleware'; // 🌟 미들웨어 임포트 추가
+import { checkLevel } from '../middlewares/authMiddleware'; 
 
 const router = express.Router();
 
@@ -16,27 +16,25 @@ const MATCH_RANGES = [
   { min: 50000, max: 9999999 }    // Stage 5: 51km 이상
 ];
 
+// 한 번에 매칭될 최대 업체 수 (랜덤 추출 기준)
+const MAX_MATCH_COUNT = 5; 
+
 // ==========================================
-// 1. 견적문의 등록 및 1단계(5km 이내) 자동 매칭
+// 1. 견적문의 등록 및 자동 점진적 확장 랜덤 매칭
 // ==========================================
-// 🌟 라우터에 checkLevel 미들웨어 장착
 router.post('/', checkLevel, async (req: Request, res: Response) => {
-  // 🌟 body에서는 memberId를 받지 않고, 토큰(req.user)에서 추출하여 변조를 방지합니다.
   const { 
     customerName, customerPhone, address, addressDetail, 
     latitude, longitude, serviceType, details, preferredDate,
     password 
   } = req.body;
 
-  // 🌟 [안전한 memberId 추출] checkLevel이 검증한 req.user 객체에서 ID를 꺼냅니다.
   const memberId = req.user?.id || null;
 
-  // 🌟 [오류 방지 1] 비회원(memberId가 null)인데 조회용 비밀번호가 없다면 차단
   if (!memberId && !password) {
     return res.status(400).json({ success: false, message: '비회원 견적 신청 시 조회용 비밀번호가 반드시 필요합니다.' });
   }
 
-  // 🌟 [오류 방지 2] 위경도 값이 누락되면 MySQL 에러 방지
   if (!latitude || !longitude) {
     return res.status(400).json({ success: false, message: '정확한 주소 좌표(위도, 경도)가 필요합니다. 주소 검색을 다시 시도해주세요.' });
   }
@@ -45,9 +43,9 @@ router.post('/', checkLevel, async (req: Request, res: Response) => {
   try {
     const location = literal(`ST_GeomFromText('POINT(${longitude} ${latitude})')`);
 
-    // DB 저장
+    // 견적서 우선 생성 (초기 스테이지 0으로 세팅)
     const newQuote = (await QuoteRequest.create({
-      memberId: memberId, // 💡 토큰에서 꺼낸 안전한 ID (회원이면 숫자, 비회원이면 null)
+      memberId: memberId, 
       password: password || null,
       customerName, 
       customerPhone, 
@@ -63,35 +61,54 @@ router.post('/', checkLevel, async (req: Request, res: Response) => {
       status: 'MATCHING'
     }, { transaction: t })) as any;
 
-    const range = MATCH_RANGES[0];
+    let matchData: any[] = [];
+    let matchedStage = 0;
 
-    const distanceQuery = literal(`ST_Distance_Sphere(POINT(\`Member\`.\`longitude\`, \`Member\`.\`latitude\`), ST_GeomFromText('POINT(${longitude} ${latitude})'))`);
+    // 🌟 [핵심 수정] 0단계부터 순차적으로 탐색 (Loop)
+    for (let stage = 0; stage < MATCH_RANGES.length; stage++) {
+      const range = MATCH_RANGES[stage];
+      const distanceQuery = literal(`ST_Distance_Sphere(POINT(\`Member\`.\`longitude\`, \`Member\`.\`latitude\`), ST_GeomFromText('POINT(${longitude} ${latitude})'))`);
 
-    const nearbyMembers = await Member.findAll({
-      attributes: ['id', [distanceQuery, 'distanceInMeters']],
-      where: {
-        latitude: { [Op.not]: null },
-        longitude: { [Op.not]: null },
-        level: { [Op.between]: [2, 9] },
-        [Op.and]: sequelize.where(distanceQuery, { [Op.between]: [range.min, range.max] })
-      },
-      transaction: t
-    });
+      const nearbyMembers = await Member.findAll({
+        attributes: ['id', [distanceQuery, 'distanceInMeters']],
+        where: {
+          latitude: { [Op.not]: null },
+          longitude: { [Op.not]: null },
+          level: { [Op.between]: [2, 9] }, // 레벨 2~9 회원만 매칭
+          [Op.and]: sequelize.where(distanceQuery, { [Op.between]: [range.min, range.max] })
+        },
+        order: sequelize.random(), // 🌟 랜덤 정렬 추출 (동일 반경 내 공평한 매칭)
+        limit: MAX_MATCH_COUNT,    // 🌟 최대 5곳까지만 랜덤으로 매칭 (무한정 매칭 방지)
+        transaction: t
+      });
 
-    const matchData = nearbyMembers.map((member: any) => ({
-      quoteRequestId: newQuote.id,
-      memberId: member.id,
-      distance: (member.getDataValue('distanceInMeters') / 1000).toFixed(2),
-      matchStage: 0,
-      status: 'WAITING'
-    }));
+      if (nearbyMembers.length > 0) {
+        matchData = nearbyMembers.map((member: any) => ({
+          quoteRequestId: newQuote.id,
+          memberId: member.id,
+          distance: (member.getDataValue('distanceInMeters') / 1000).toFixed(2),
+          matchStage: stage,
+          status: 'WAITING'
+        }));
+        
+        matchedStage = stage;
+        break; // 🌟 업체를 1곳 이상 찾았다면 다음 반경으로 넓히지 않고 즉시 중단
+      }
+    }
 
+    // 매칭된 업체가 있다면 DB 삽입 및 견적의 스테이지 업데이트
     if (matchData.length > 0) {
       await QuoteMatch.bulkCreate(matchData, { transaction: t });
+      await newQuote.update({ currentMatchStage: matchedStage }, { transaction: t });
     }
 
     await t.commit();
-    res.status(201).json({ success: true, data: newQuote, matchedCount: matchData.length });
+    res.status(201).json({ 
+      success: true, 
+      data: newQuote, 
+      matchedCount: matchData.length,
+      matchedStage: matchedStage 
+    });
   } catch (error) {
     await t.rollback();
     console.error('견적 등록 에러:', error);
@@ -208,7 +225,9 @@ router.post('/:id/expand-match', async (req: Request, res: Response) => {
         level: { [Op.between]: [2, 9] },
         id: { [Op.notIn]: excludeIds },
         [Op.and]: sequelize.where(distanceQuery, { [Op.between]: [range.min, range.max] })
-      }
+      },
+      order: sequelize.random(), // 🌟 수동 확장에서도 랜덤 적용
+      limit: MAX_MATCH_COUNT     // 🌟 수동 확장에서도 최대 5곳
     });
 
     const matchData = newMembers.map((member: any) => ({
@@ -248,7 +267,7 @@ router.post('/guest-search', async (req: Request, res: Response) => {
       where: {
         customerName,
         customerPhone,
-        password, // 실 서비스 시에는 암호화 검증 권장
+        password, 
       },
       attributes: { exclude: ['location', 'password'] },
       include: [

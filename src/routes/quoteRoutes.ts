@@ -172,7 +172,8 @@ router.get('/:id', async (req: Request, res: Response) => {
             {
               model: Member,
               as: 'member',
-              attributes: ['id', 'companyName', 'name', 'phone']
+              // 🌟 수정: name(담당자명)과 mobile(휴대폰) 추가 호출
+              attributes: ['id', 'companyName', 'name', 'phone', 'mobile']
             }
           ]
         }
@@ -264,11 +265,7 @@ router.post('/guest-search', async (req: Request, res: Response) => {
     }
 
     const quote = await QuoteRequest.findOne({
-      where: {
-        customerName,
-        customerPhone,
-        password, 
-      },
+      where: { customerName, customerPhone, password },
       attributes: { exclude: ['location', 'password'] },
       include: [
         {
@@ -278,7 +275,8 @@ router.post('/guest-search', async (req: Request, res: Response) => {
             {
               model: Member,
               as: 'member',
-              attributes: ['id', 'companyName', 'phone']
+              // 🌟 수정: 비회원 조회 시에도 name, mobile 추가
+              attributes: ['id', 'companyName', 'name', 'phone', 'mobile']
             }
           ]
         }
@@ -292,7 +290,6 @@ router.post('/guest-search', async (req: Request, res: Response) => {
 
     const formattedQuote = quote.toJSON();
     
-    // 리뷰 재가공
     if (formattedQuote.reviewContent) {
       formattedQuote.review = {
         rating: formattedQuote.reviewRating,
@@ -303,11 +300,11 @@ router.post('/guest-search', async (req: Request, res: Response) => {
       formattedQuote.review = null;
     }
     
-    // matches가 없거나 member가 없는 경우 map 에러 방지
+    // 🌟 수정: 기업명이 없으면 담당자명으로, 유선번호가 없으면 휴대폰 번호로 대체
     formattedQuote.matchedPartners = (formattedQuote.matches || []).map((m: any) => ({
       id: m.member?.id,
-      companyName: m.member?.companyName,
-      phone: m.member?.phone
+      companyName: m.member?.companyName || m.member?.name || '업체명 미상',
+      phone: m.member?.phone || m.member?.mobile || '연락처 없음'
     }));
     delete formattedQuote.matches;
 

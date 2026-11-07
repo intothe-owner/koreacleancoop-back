@@ -55,7 +55,7 @@ QuoteRequest.init({
     comment: '서비스별 상세 견적 정보 (JSON 형식)' 
   },
   status: { 
-    type: DataTypes.ENUM('PENDING', 'MATCHING', 'MATCHED', 'COMPLETED', 'CANCELED'), 
+    type: DataTypes.ENUM('PENDING', 'MATCHING', 'MATCHED', 'COMPLETED','PROPOSED', 'CANCELED'), 
     defaultValue: 'PENDING', 
     comment: '진행 상태' 
   },

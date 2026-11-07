@@ -89,7 +89,7 @@ app.use('/api', customerRoutes);
 app.use('/api/social-contributions', socialContributionRoutes);
 app.use('/api/quotes', quoteRoutes);
 app.use('/api/mypage', mypageRoutes);
-app.use('/api/report', reportRoutes);
+app.use('/api/reports', reportRoutes);
 const syncOptions = process.env.NODE_ENV === 'production' ? {} : { alter: true };
 
 // DB 동기화 및 서버 실행 (app.listen 대신 server.listen 사용)

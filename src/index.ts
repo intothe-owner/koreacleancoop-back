@@ -22,6 +22,8 @@ import qualificationsRouter from './routes/qualificationsRoutes';
 import customerRoutes from './routes/customerRoutes';
 import socialContributionRoutes from './routes/socialContributionRoutes';
 import quoteRoutes from './routes/quoteRoutes';
+import mypageRoutes from './routes/mypageRoutes';
+import reportRoutes from './routes/reportRoutes';
 
 import path from 'path';
 
@@ -86,6 +88,8 @@ app.use('/api/qualifications', qualificationsRouter);
 app.use('/api', customerRoutes); 
 app.use('/api/social-contributions', socialContributionRoutes);
 app.use('/api/quotes', quoteRoutes);
+app.use('/api/mypage', mypageRoutes);
+app.use('/api/report', reportRoutes);
 const syncOptions = process.env.NODE_ENV === 'production' ? {} : { alter: true };
 
 // DB 동기화 및 서버 실행 (app.listen 대신 server.listen 사용)

@@ -20,6 +20,7 @@ import { Customer } from './Customer';
 import { SocialContribution } from "./SocialContribution";
 import { QuoteRequest } from './QuoteRequest';
 import { QuoteMatch } from './QuoteMatch';
+import { WorkReport } from './WorkReport';
 
 // --- 테이블 간의 관계(Relation) 정의 ---
 
@@ -84,6 +85,8 @@ Member.hasMany(QuoteRequest, { foreignKey: 'matchedMemberId', as: 'matchedReques
 QuoteRequest.belongsTo(Member, { foreignKey: 'matchedMemberId', as: 'matchedMember' });
 
 
+QuoteRequest.hasOne(WorkReport, { foreignKey: 'quoteRequestId', as: 'report' });
+WorkReport.belongsTo(QuoteRequest, { foreignKey: 'quoteRequestId' });
 export { 
     Menu, 
     Page, 
@@ -101,5 +104,6 @@ export {
     Customer,
     SocialContribution,
     QuoteRequest,
-    QuoteMatch
+    QuoteMatch,
+    WorkReport,
 };

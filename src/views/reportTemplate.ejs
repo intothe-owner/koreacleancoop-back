@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>작업 보고서</title>
+  <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" rel="stylesheet" />
+  <style>
+    @page { size: A4; margin: 15mm; }
+    body { 
+      font-family: 'Pretendard', sans-serif; 
+      margin: 0; 
+      padding: 0;
+      color: #000;
+      box-sizing: border-box;
+    }
+    .container { width: 100%; }
+    .title {
+      text-align: center;
+      font-size: 24px;
+      font-weight: 800;
+      margin-bottom: 20px;
+      margin-top: 10px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 10px;
+      table-layout: fixed;
+    }
+    th, td {
+      border: 1px solid #000;
+      padding: 8px 5px;
+      text-align: center;
+      font-size: 11px;
+      word-break: break-all;
+    }
+    th {
+      background-color: #f8f9fa;
+      font-weight: 700;
+      width: 15%;
+    }
+    td { width: 35%; }
+    
+    /* 주소 한줄 처리용 클래스 */
+    .address-cell {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: left;
+      padding-left: 10px;
+    }
+
+    /* 이미지 2x2 그리드 영역 */
+    .photo-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      width: 100%;
+      border-top: 2px solid #000;
+      border-left: 1px solid #000;
+      border-right: 1px solid #000;
+    }
+    .photo-cell {
+      border-bottom: 1px solid #000;
+      border-right: 1px solid #000;
+      display: flex;
+      flex-direction: column;
+    }
+    .photo-cell:nth-child(even) {
+      border-right: none;
+    }
+    .photo-title {
+      text-align: center;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 8px;
+      border-bottom: 1px solid #000;
+      background-color: #f8f9fa;
+    }
+    .photo-img-wrapper {
+      height: 320px; /* A4 1페이지에 맞추기 위한 최적 높이 */
+      padding: 10px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .photo-img-wrapper img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="title"><%= customerName %> <%= serviceName %> 세척/방역 보고서</div>
+    
+    <table>
+      <tr>
+        <th>회사명</th>
+        <td><%= companyName %></td>
+        <th>주소</th>
+        <td class="address-cell"><%= address %></td>
+      </tr>
+      <tr>
+        <th>거래처명</th>
+        <td><%= customerName %></td>
+        <th>용역명</th>
+        <td><%= customerName %> <%= serviceName %></td>
+      </tr>
+      <tr>
+        <th>작업일자</th>
+        <td><%= workDate %></td>
+        <th>전화번호</th>
+        <td><%= customerPhone %></td>
+      </tr>
+      <tr>
+        <th>작업사진</th>
+        <td><%= workerName %></td>
+        <th>대표</th>
+        <td><%= representativeName %></td>
+      </tr>
+    </table>
+
+    <!-- 4장 사진 영역 -->
+    <div class="photo-grid">
+      <div class="photo-cell">
+        <div class="photo-title">[<%= serviceName %>] 입구</div>
+        <div class="photo-img-wrapper">
+          <img src="<%= entranceImg %>" alt="입구">
+        </div>
+      </div>
+      <div class="photo-cell">
+        <div class="photo-title">[<%= serviceName %>] 작업 전</div>
+        <div class="photo-img-wrapper">
+          <img src="<%= beforeImg %>" alt="작업전">
+        </div>
+      </div>
+      <div class="photo-cell">
+        <div class="photo-title">[<%= serviceName %>] 작업 중</div>
+        <div class="photo-img-wrapper">
+          <img src="<%= duringImg %>" alt="작업중">
+        </div>
+      </div>
+      <div class="photo-cell">
+        <div class="photo-title">[<%= serviceName %>] 작업 후</div>
+        <div class="photo-img-wrapper">
+          <img src="<%= afterImg %>" alt="작업후">
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

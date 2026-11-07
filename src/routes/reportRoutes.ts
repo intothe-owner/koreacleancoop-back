@@ -123,6 +123,7 @@ router.post('/:quoteId', checkLevel, uploadReportImages.fields([
     res.status(500).json({ success: false, message: '서버 에러가 발생하여 보고서를 저장하지 못했습니다.' });
   }
 });
+
 // ==========================================
 // 📄 작업 보고서 PDF 생성 및 S3 업로드 후 URL 반환
 // GET /api/reports/:quoteId/pdf
@@ -165,14 +166,22 @@ router.get('/:quoteId/pdf', async (req: Request, res: Response) => {
     const ejsPath = path.join(__dirname, '../views/reportTemplate.ejs');
     const htmlContent = await ejs.renderFile(ejsPath, templateData);
 
-    // 4. Puppeteer를 이용해 HTML -> PDF 변환
+    // 🌟 4. Puppeteer를 이용해 HTML -> PDF 변환 (Docker 옵션 적용)
     const browser = await puppeteer.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'] 
+      // 🌟 Dockerfile에서 설정한 OS 경로 강제 적용
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined, 
+      args: [
+        '--no-sandbox', 
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage', // 🌟 도커 환경 필수 (메모리 부족 방지)
+        '--disable-gpu'
+      ] 
     });
+    
     const page = await browser.newPage();
     
-    // 💡 [수정됨] 타입 에러 해결 및 외부 이미지 로딩 대기
+    // 💡 타입 에러 해결 및 외부 이미지 로딩 대기
     await page.setContent(htmlContent, { waitUntil: 'load' });
     await page.waitForNetworkIdle({ idleTime: 500 }); // S3 등 외부 네트워크 완전 대기
     

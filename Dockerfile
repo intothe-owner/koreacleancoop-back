@@ -23,7 +23,7 @@ COPY . .
 
 RUN npm run build
 
-# 🌟 4. [여기에 추가] 컴파일 직후 src/views 폴더를 dist/views로 복사
+# 🌟 컴파일 직후 src/views 폴더를 dist/views로 복사
 RUN cp -r src/views dist/views
 
 # =====================================
@@ -37,8 +37,26 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 
+# =====================================
+# 🌟 [추가] Alpine Linux용 Chromium 및 한글 폰트 설치
+# PDF 생성을 위한 브라우저 엔진과 한글 깨짐 방지 폰트
+# =====================================
+RUN apk add --no-cache \
+    chromium \
+    nss \
+    freetype \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont \
+    font-noto-cjk
 
 
+# =====================================
+# 🌟 [추가] Puppeteer 환경 변수 설정
+# npm 설치 시 자체 다운로드를 막고 방금 설치한 OS 크롬 경로를 지정
+# =====================================
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 
 # =====================================
@@ -54,15 +72,6 @@ RUN npm ci --omit=dev \
 # 빌드 결과물 복사
 # =====================================
 COPY --from=builder /app/dist ./dist
-
-
-# =====================================
-# 필요한 파일 복사
-# 실제 프로젝트에 존재할 때만 사용
-# =====================================
-# COPY --from=builder /app/assets ./assets
-# COPY --from=builder /app/templates ./templates
-# COPY --from=builder /app/public ./public
 
 
 # =====================================

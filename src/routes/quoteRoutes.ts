@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { Op, literal } from 'sequelize';
 import { sequelize } from '../config/database';
 import { QuoteRequest, QuoteMatch, Member } from '../models';
+import { checkLevel } from '../middlewares/authMiddleware'; // 🌟 미들웨어 임포트 추가
 
 const router = express.Router();
 
@@ -18,22 +19,52 @@ const MATCH_RANGES = [
 // ==========================================
 // 1. 견적문의 등록 및 1단계(5km 이내) 자동 매칭
 // ==========================================
-router.post('/', async (req: Request, res: Response) => {
+// 🌟 라우터에 checkLevel 미들웨어 장착
+router.post('/', checkLevel, async (req: Request, res: Response) => {
+  // 🌟 body에서는 memberId를 받지 않고, 토큰(req.user)에서 추출하여 변조를 방지합니다.
+  const { 
+    customerName, customerPhone, address, addressDetail, 
+    latitude, longitude, serviceType, details, preferredDate,
+    password 
+  } = req.body;
+
+  // 🌟 [안전한 memberId 추출] checkLevel이 검증한 req.user 객체에서 ID를 꺼냅니다.
+  const memberId = req.user?.id || null;
+
+  // 🌟 [오류 방지 1] 비회원(memberId가 null)인데 조회용 비밀번호가 없다면 차단
+  if (!memberId && !password) {
+    return res.status(400).json({ success: false, message: '비회원 견적 신청 시 조회용 비밀번호가 반드시 필요합니다.' });
+  }
+
+  // 🌟 [오류 방지 2] 위경도 값이 누락되면 MySQL 에러 방지
+  if (!latitude || !longitude) {
+    return res.status(400).json({ success: false, message: '정확한 주소 좌표(위도, 경도)가 필요합니다. 주소 검색을 다시 시도해주세요.' });
+  }
+
   const t = await sequelize.transaction();
   try {
-    const { customerName, customerPhone, address, addressDetail, latitude, longitude, serviceType, details, preferredDate } = req.body;
-
-    // QuoteRequest에는 location POINT 객체 생성 삽입
     const location = literal(`ST_GeomFromText('POINT(${longitude} ${latitude})')`);
 
+    // DB 저장
     const newQuote = (await QuoteRequest.create({
-      customerName, customerPhone, address, addressDetail, latitude, longitude, location,
-      serviceType, details, preferredDate, currentMatchStage: 0, status: 'MATCHING'
+      memberId: memberId, // 💡 토큰에서 꺼낸 안전한 ID (회원이면 숫자, 비회원이면 null)
+      password: password || null,
+      customerName, 
+      customerPhone, 
+      address, 
+      addressDetail, 
+      latitude, 
+      longitude, 
+      location,
+      serviceType, 
+      details, 
+      preferredDate, 
+      currentMatchStage: 0, 
+      status: 'MATCHING'
     }, { transaction: t })) as any;
 
     const range = MATCH_RANGES[0];
 
-    // Member 테이블의 longitude, latitude(DECIMAL)를 MySQL POINT 함수로 묶어서 거리 계산
     const distanceQuery = literal(`ST_Distance_Sphere(POINT(\`Member\`.\`longitude\`, \`Member\`.\`latitude\`), ST_GeomFromText('POINT(${longitude} ${latitude})'))`);
 
     const nearbyMembers = await Member.findAll({
@@ -41,7 +72,7 @@ router.post('/', async (req: Request, res: Response) => {
       where: {
         latitude: { [Op.not]: null },
         longitude: { [Op.not]: null },
-        level: { [Op.between]: [2, 9] }, // 🌟 레벨 2~9 회원만 매칭
+        level: { [Op.between]: [2, 9] },
         [Op.and]: sequelize.where(distanceQuery, { [Op.between]: [range.min, range.max] })
       },
       transaction: t
@@ -50,7 +81,7 @@ router.post('/', async (req: Request, res: Response) => {
     const matchData = nearbyMembers.map((member: any) => ({
       quoteRequestId: newQuote.id,
       memberId: member.id,
-      distance: (member.getDataValue('distanceInMeters') / 1000).toFixed(2), // 미터를 km로 변환
+      distance: (member.getDataValue('distanceInMeters') / 1000).toFixed(2),
       matchStage: 0,
       status: 'WAITING'
     }));
@@ -63,7 +94,7 @@ router.post('/', async (req: Request, res: Response) => {
     res.status(201).json({ success: true, data: newQuote, matchedCount: matchData.length });
   } catch (error) {
     await t.rollback();
-    console.error(error);
+    console.error('견적 등록 에러:', error);
     res.status(500).json({ success: false, message: '견적 요청 등록 및 매칭 실패' });
   }
 });
@@ -88,7 +119,7 @@ router.get('/', async (req: Request, res: Response) => {
       order: [['createdAt', 'DESC']],
       limit,
       offset,
-      attributes: { exclude: ['location'] } // GEOMETRY 제외
+      attributes: { exclude: ['location'] }
     });
 
     res.json({
@@ -124,7 +155,7 @@ router.get('/:id', async (req: Request, res: Response) => {
             {
               model: Member,
               as: 'member',
-              attributes: ['id', 'companyName', 'name', 'phone'] // 기업명 추가
+              attributes: ['id', 'companyName', 'name', 'phone']
             }
           ]
         }
@@ -161,7 +192,6 @@ router.post('/:id/expand-match', async (req: Request, res: Response) => {
 
     const range = MATCH_RANGES[nextStage];
     
-    // 확장 매칭에서도 Member.longitude와 Member.latitude를 사용하도록 수정
     const distanceQuery = literal(`ST_Distance_Sphere(POINT(\`Member\`.\`longitude\`, \`Member\`.\`latitude\`), ST_GeomFromText('POINT(${quote.longitude} ${quote.latitude})'))`);
 
     const existingMatches = await QuoteMatch.findAll({ 
@@ -173,9 +203,9 @@ router.post('/:id/expand-match', async (req: Request, res: Response) => {
     const newMembers = await Member.findAll({
       attributes: ['id', [distanceQuery, 'distanceInMeters']],
       where: {
-        latitude: { [Op.not]: null }, // 위경도 값이 있는 회원만 조회
+        latitude: { [Op.not]: null },
         longitude: { [Op.not]: null },
-        level: { [Op.between]: [2, 9] }, // 🌟 확장 매칭에서도 레벨 2~9 회원만 매칭
+        level: { [Op.between]: [2, 9] },
         id: { [Op.notIn]: excludeIds },
         [Op.and]: sequelize.where(distanceQuery, { [Op.between]: [range.min, range.max] })
       }
@@ -201,6 +231,7 @@ router.post('/:id/expand-match', async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: '반경 확장 매칭 실패' });
   }
 });
+
 // ==========================================
 // 비회원 견적문의 조회 (이름, 연락처, 비밀번호 매칭)
 // POST /api/quotes/guest-search
@@ -217,9 +248,9 @@ router.post('/guest-search', async (req: Request, res: Response) => {
       where: {
         customerName,
         customerPhone,
-        password, // 실제 서비스 시 bcrypt.compare 등 암호화 검증 필요
+        password, // 실 서비스 시에는 암호화 검증 권장
       },
-      attributes: { exclude: ['location', 'password'] }, // 위치 공간 데이터와 비번은 가림
+      attributes: { exclude: ['location', 'password'] },
       include: [
         {
           model: QuoteMatch,
@@ -228,7 +259,7 @@ router.post('/guest-search', async (req: Request, res: Response) => {
             {
               model: Member,
               as: 'member',
-              attributes: ['id', 'companyName', 'phone'] // 매칭된 업체의 상호명과 연락처만 노출
+              attributes: ['id', 'companyName', 'phone']
             }
           ]
         }
@@ -240,8 +271,9 @@ router.post('/guest-search', async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, message: '입력하신 정보와 일치하는 견적 내역이 없습니다.' });
     }
 
-    // 프론트엔드의 quoteDetail 객체 형식에 맞게 데이터 재가공 (review 속성 등)
     const formattedQuote = quote.toJSON();
+    
+    // 리뷰 재가공
     if (formattedQuote.reviewContent) {
       formattedQuote.review = {
         rating: formattedQuote.reviewRating,
@@ -252,11 +284,11 @@ router.post('/guest-search', async (req: Request, res: Response) => {
       formattedQuote.review = null;
     }
     
-    // matchedPartners 배열 평탄화
-    formattedQuote.matchedPartners = formattedQuote.matches.map((m: any) => ({
-      id: m.member.id,
-      companyName: m.member.companyName,
-      phone: m.member.phone
+    // matches가 없거나 member가 없는 경우 map 에러 방지
+    formattedQuote.matchedPartners = (formattedQuote.matches || []).map((m: any) => ({
+      id: m.member?.id,
+      companyName: m.member?.companyName,
+      phone: m.member?.phone
     }));
     delete formattedQuote.matches;
 
@@ -266,4 +298,5 @@ router.post('/guest-search', async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: '조회 중 오류가 발생했습니다.' });
   }
 });
+
 export default router;

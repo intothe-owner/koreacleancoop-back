@@ -69,6 +69,11 @@ QuoteRequest.init({
     allowNull: true, 
     comment: '희망 시공일' 
   },
+  memberId: { 
+    type: DataTypes.INTEGER, 
+    allowNull: true, 
+    comment: '고객 회원 ID' 
+  },
   matchedMemberId: { 
     type: DataTypes.INTEGER, 
     allowNull: true, 

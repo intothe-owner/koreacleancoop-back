@@ -23,6 +23,8 @@ COPY . .
 
 RUN npm run build
 
+# 🌟 4. [여기에 추가] 컴파일 직후 src/views 폴더를 dist/views로 복사
+RUN cp -r src/views dist/views
 
 # =====================================
 # 2. 실행 단계

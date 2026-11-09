@@ -314,5 +314,71 @@ router.post('/guest-search', async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: '조회 중 오류가 발생했습니다.' });
   }
 });
+// ==========================================
+// [관리자용] 수동 매칭을 위한 근처 업체 목록 조회
+// GET /api/quotes/:id/nearby
+// ==========================================
+router.get('/:id/nearby', async (req: Request, res: Response) => {
+  try {
+    const quote = await QuoteRequest.findByPk(Number(req.params.id)) as any;
+    if (!quote) return res.status(404).json({ success: false, message: '견적을 찾을 수 없습니다.' });
 
+    // 이미 매칭된 업체 제외
+    const existingMatches = await QuoteMatch.findAll({ where: { quoteRequestId: quote.id } });
+    const excludeIds = existingMatches.map((m: any) => m.memberId);
+
+    // 견적 위치(위경도)를 기준으로 모든 회원과의 거리를 계산 (가까운 순 정렬)
+    const distanceQuery = literal(`ST_Distance_Sphere(POINT(\`Member\`.\`longitude\`, \`Member\`.\`latitude\`), ST_GeomFromText('POINT(${quote.longitude} ${quote.latitude})'))`);
+
+    const members = await Member.findAll({
+      attributes: ['id', 'companyName', 'name', 'phone', 'mobile', [distanceQuery, 'distanceInMeters']],
+      where: {
+        level: { [Op.between]: [2, 9] },
+        latitude: { [Op.not]: null },
+        longitude: { [Op.not]: null },
+        id: { [Op.notIn]: excludeIds }
+      },
+      order: [[literal('distanceInMeters'), 'ASC']], // 🌟 가까운 순서대로 정렬
+      limit: 20 // 쾌적한 조회를 위해 상위 20곳만 표출
+    });
+
+    res.json({ success: true, data: members });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: '근처 업체 조회 실패' });
+  }
+});
+
+// ==========================================
+// [관리자용] 특정 업체 수동 매칭(할당) 처리
+// POST /api/quotes/:id/assign
+// ==========================================
+router.post('/:id/assign', async (req: Request, res: Response) => {
+  try {
+    const quoteId = Number(req.params.id);
+    const { memberId, distance } = req.body;
+
+    const quote = await QuoteRequest.findByPk(quoteId) as any;
+    if (!quote) return res.status(404).json({ success: false, message: '견적을 찾을 수 없습니다.' });
+
+    // 수동 매칭 데이터 삽입
+    await QuoteMatch.create({
+      quoteRequestId: quoteId,
+      memberId: memberId,
+      distance: (Number(distance) / 1000).toFixed(2), // 미터를 km로 변환
+      matchStage: 99, // 🌟 99: 관리자가 수동으로 꽂아준 매칭임을 구분
+      status: 'WAITING'
+    });
+
+    // 만약 취소된 견적이었다면 다시 활성화(MATCHING)
+    if (quote.status === 'CANCELED') {
+      await quote.update({ status: 'MATCHING' });
+    }
+
+    res.json({ success: true, message: '배정 성공' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: '수동 배정 중 서버 오류' });
+  }
+});
 export default router;

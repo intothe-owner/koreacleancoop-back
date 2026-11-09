@@ -195,7 +195,7 @@ router.get('/:quoteId/pdf', async (req: Request, res: Response) => {
 
     // 5. AWS S3에 PDF 업로드
     const fileName = `uploads/reports/pdfs/report_${quoteId}_${Date.now()}.pdf`;
-    const downloadFileName = `${templateData.serviceName}-${templateData.customerName}.pdf`;
+    const downloadFileName = `${templateData.serviceName}-${templateData.customerName}보고서.pdf`;
     const encodedFileName = encodeURIComponent(downloadFileName);
     
     await s3.send(new PutObjectCommand({

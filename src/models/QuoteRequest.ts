@@ -55,8 +55,8 @@ QuoteRequest.init({
     comment: '서비스별 상세 견적 정보 (JSON 형식)' 
   },
   status: { 
-    type: DataTypes.ENUM('PENDING', 'MATCHING', 'MATCHED', 'COMPLETED','PROPOSED', 'CANCELED'), 
-    defaultValue: 'PENDING', 
+    type: DataTypes.ENUM('PENDING', 'MATCHING', 'MATCHED', 'COMPLETED', 'PROPOSED', 'CANCELED'), 
+    defaultValue: 'MATCHING', // 🌟 견적 등록과 동시에 매칭이 시작되므로 기본값을 MATCHING으로 설정
     comment: '진행 상태' 
   },
   currentMatchStage: { 
@@ -74,6 +74,14 @@ QuoteRequest.init({
     allowNull: true, 
     comment: '고객 회원 ID' 
   },
+  
+  // 🌟 [추가됨] 비회원 조회를 위한 비밀번호 컬럼
+  password: { 
+    type: DataTypes.STRING, 
+    allowNull: true, 
+    comment: '비회원 견적 조회용 비밀번호' 
+  },
+
   matchedMemberId: { 
     type: DataTypes.INTEGER, 
     allowNull: true, 
@@ -89,7 +97,7 @@ QuoteRequest.init({
   indexes: [
     {
       type: 'SPATIAL',
-      fields: ['location'] // 공간 검색을 위한 SPATIAL 인덱스 추가
+      fields: ['location'] 
     }
   ]
 });

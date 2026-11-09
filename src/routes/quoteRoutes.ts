@@ -17,7 +17,7 @@ const MATCH_RANGES = [
 ];
 
 // 한 번에 매칭될 최대 업체 수 (랜덤 추출 기준)
-const MAX_MATCH_COUNT = 5; 
+const MAX_MATCH_COUNT = 1; 
 
 // ==========================================
 // 1. 견적문의 등록 및 자동 점진적 확장 랜덤 매칭
@@ -26,11 +26,12 @@ router.post('/', checkLevel, async (req: Request, res: Response) => {
   const { 
     customerName, customerPhone, address, addressDetail, 
     latitude, longitude, serviceType, details, preferredDate,
-    password 
+    password // 🌟 클라이언트로부터 password를 추출
   } = req.body;
 
   const memberId = req.user?.id || null;
 
+  // 비회원일 경우 비밀번호가 반드시 필요하도록 방어 로직
   if (!memberId && !password) {
     return res.status(400).json({ success: false, message: '비회원 견적 신청 시 조회용 비밀번호가 반드시 필요합니다.' });
   }
@@ -43,10 +44,10 @@ router.post('/', checkLevel, async (req: Request, res: Response) => {
   try {
     const location = literal(`ST_GeomFromText('POINT(${longitude} ${latitude})')`);
 
-    // 견적서 우선 생성 (초기 스테이지 0으로 세팅)
+    // 🌟 DB 저장 시 password 함께 저장
     const newQuote = (await QuoteRequest.create({
       memberId: memberId, 
-      password: password || null,
+      password: password || null, // 💡 전달받은 비밀번호 저장
       customerName, 
       customerPhone, 
       address, 
@@ -64,7 +65,7 @@ router.post('/', checkLevel, async (req: Request, res: Response) => {
     let matchData: any[] = [];
     let matchedStage = 0;
 
-    // 🌟 [핵심 수정] 0단계부터 순차적으로 탐색 (Loop)
+    // 점진적 확장 매칭 로직 (기존과 동일)
     for (let stage = 0; stage < MATCH_RANGES.length; stage++) {
       const range = MATCH_RANGES[stage];
       const distanceQuery = literal(`ST_Distance_Sphere(POINT(\`Member\`.\`longitude\`, \`Member\`.\`latitude\`), ST_GeomFromText('POINT(${longitude} ${latitude})'))`);
@@ -74,11 +75,11 @@ router.post('/', checkLevel, async (req: Request, res: Response) => {
         where: {
           latitude: { [Op.not]: null },
           longitude: { [Op.not]: null },
-          level: { [Op.between]: [2, 9] }, // 레벨 2~9 회원만 매칭
+          level: { [Op.between]: [2, 9] }, 
           [Op.and]: sequelize.where(distanceQuery, { [Op.between]: [range.min, range.max] })
         },
-        order: sequelize.random(), // 🌟 랜덤 정렬 추출 (동일 반경 내 공평한 매칭)
-        limit: MAX_MATCH_COUNT,    // 🌟 최대 5곳까지만 랜덤으로 매칭 (무한정 매칭 방지)
+        order: sequelize.random(), 
+        limit: MAX_MATCH_COUNT,    
         transaction: t
       });
 
@@ -92,11 +93,10 @@ router.post('/', checkLevel, async (req: Request, res: Response) => {
         }));
         
         matchedStage = stage;
-        break; // 🌟 업체를 1곳 이상 찾았다면 다음 반경으로 넓히지 않고 즉시 중단
+        break; 
       }
     }
 
-    // 매칭된 업체가 있다면 DB 삽입 및 견적의 스테이지 업데이트
     if (matchData.length > 0) {
       await QuoteMatch.bulkCreate(matchData, { transaction: t });
       await newQuote.update({ currentMatchStage: matchedStage }, { transaction: t });

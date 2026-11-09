@@ -195,13 +195,16 @@ router.get('/:quoteId/pdf', async (req: Request, res: Response) => {
 
     // 5. AWS S3에 PDF 업로드
     const fileName = `uploads/reports/pdfs/report_${quoteId}_${Date.now()}.pdf`;
+    const downloadFileName = `${templateData.serviceName}-${templateData.customerName}.pdf`;
+    const encodedFileName = encodeURIComponent(downloadFileName);
     
     await s3.send(new PutObjectCommand({
       Bucket: process.env.AWS_S3_BUCKET_NAME as string,
       Key: fileName,
       Body: pdfBuffer,
       ContentType: 'application/pdf',
-      ContentDisposition: `attachment; filename="report_${quoteId}.pdf"`
+      // 🌟 [수정] RFC 5987 규격을 사용하여 안전하게 한글 파일명 헤더 적용
+      ContentDisposition: `attachment; filename*=UTF-8''${encodedFileName}`
     }));
 
     const pdfS3Url = `https://${process.env.AWS_S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;

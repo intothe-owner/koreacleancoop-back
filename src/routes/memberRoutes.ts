@@ -191,7 +191,7 @@ router.patch('/:id/approve', checkLevel, async (req: Request, res: Response) => 
     }
 
     const setting = await MemberSetting.findByPk(1);
-    const defaultLvl = setting ? setting.getDataValue('defaultLevel') : 1;
+    const defaultLvl = setting ? setting.getDataValue('defaultLevel') : 2;
 
     await member.update({ level: defaultLvl });
 

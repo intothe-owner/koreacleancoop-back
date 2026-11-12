@@ -13,7 +13,7 @@ router.get('/', async (req: Request, res: Response) => {
         {
           model: EduSchedule,
           as: 'scheduleInfo',
-          attributes: ['id', 'title', 'eduDate', 'location', 'status'] // 연결된 일정 정보도 함께 가져옴
+          attributes: ['id', 'title','startDate','endDate', 'location', 'status'] // 연결된 일정 정보도 함께 가져옴
         }
       ]
     });
@@ -34,7 +34,7 @@ router.get('/:id', async (req: Request, res: Response) => {
         {
           model: EduSchedule,
           as: 'scheduleInfo',
-          attributes: ['id', 'title', 'eduDate', 'location', 'status']
+          attributes: ['id', 'title','startDate', 'endDate', 'location', 'status']
         }
       ]
     });

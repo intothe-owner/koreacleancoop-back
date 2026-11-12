@@ -21,6 +21,8 @@ import { SocialContribution } from "./SocialContribution";
 import { QuoteRequest } from './QuoteRequest';
 import { QuoteMatch } from './QuoteMatch';
 import { WorkReport } from './WorkReport';
+import { EduSchedule } from './EduSchedule';       // 신규 추가
+import { EduApplication } from './EduApplication'; // 신규 추가
 
 // --- 테이블 간의 관계(Relation) 정의 ---
 
@@ -87,6 +89,15 @@ QuoteRequest.belongsTo(Member, { foreignKey: 'matchedMemberId', as: 'matchedMemb
 
 QuoteRequest.hasOne(WorkReport, { foreignKey: 'quoteRequestId', as: 'report' });
 WorkReport.belongsTo(QuoteRequest, { foreignKey: 'quoteRequestId' });
+
+
+// --- 교육 일정 및 신청 관계(Relation) 정의 ---
+
+// 교육일정(1) - 교육신청(N) : 하나의 일정에 여러 고객이 신청함
+EduSchedule.hasMany(EduApplication, { foreignKey: 'scheduleId', as: 'applications', onDelete: 'SET NULL' });
+EduApplication.belongsTo(EduSchedule, { foreignKey: 'scheduleId', as: 'scheduleInfo' });
+
+
 export { 
     Menu, 
     Page, 
@@ -106,4 +117,6 @@ export {
     QuoteRequest,
     QuoteMatch,
     WorkReport,
+    EduSchedule,      // 신규 내보내기
+    EduApplication,   // 신규 내보내기
 };

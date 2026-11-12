@@ -1,3 +1,4 @@
+// src/index.ts
 import express, { Request, Response } from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
@@ -24,7 +25,8 @@ import socialContributionRoutes from './routes/socialContributionRoutes';
 import quoteRoutes from './routes/quoteRoutes';
 import mypageRoutes from './routes/mypageRoutes';
 import reportRoutes from './routes/reportRoutes';
-
+import eduScheduleRoutes from './routes/eduScheduleRoutes'; // 🌟 신규 라우터 추가
+import eduApplicationRoutes from './routes/eduApplicationRoutes';
 import path from 'path';
 
 dotenv.config();
@@ -90,6 +92,9 @@ app.use('/api/social-contributions', socialContributionRoutes);
 app.use('/api/quotes', quoteRoutes);
 app.use('/api/mypage', mypageRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/edu-schedules', eduScheduleRoutes); // 🌟 신규 라우터 연결
+app.use('/api/edu-applications', eduApplicationRoutes);
+
 const syncOptions = process.env.NODE_ENV === 'production' ? {} : { alter: true };
 
 // DB 동기화 및 서버 실행 (app.listen 대신 server.listen 사용)

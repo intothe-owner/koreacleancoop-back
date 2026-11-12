@@ -55,11 +55,13 @@ router.get('/:id', async (req: Request, res: Response) => {
 // 3. 교육 일정 등록 (관리자용)
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { title, eduDate, location, status } = req.body;
+    // eduDate 대신 startDate, endDate 받기
+    const { title, startDate, endDate, location, status } = req.body;
 
     const newSchedule = await EduSchedule.create({
       title,
-      eduDate,
+      startDate,
+      endDate,
       location,
       status: status || '준비중',
     });
@@ -75,14 +77,15 @@ router.post('/', async (req: Request, res: Response) => {
 router.put('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { title, eduDate, location, status } = req.body;
+    // eduDate 대신 startDate, endDate 받기
+    const { title, startDate, endDate, location, status } = req.body;
 
     const schedule = await EduSchedule.findByPk(Number(id));
     if (!schedule) {
       return res.status(404).json({ message: '해당 교육 일정을 찾을 수 없습니다.' });
     }
 
-    await schedule.update({ title, eduDate, location, status });
+    await schedule.update({ title, startDate, endDate, location, status });
 
     res.status(200).json(schedule);
   } catch (error) {

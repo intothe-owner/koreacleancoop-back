@@ -16,7 +16,12 @@ EduSchedule.init({
     allowNull: false, 
     comment: '교육명' 
   },
-  eduDate: { 
+  startDate: { 
+    type: DataTypes.STRING, 
+    allowNull: false, 
+    comment: '교육 시작일 (예: 2026-12-01)' 
+  },
+  endDate: { 
     type: DataTypes.STRING, 
     allowNull: false, 
     comment: '교육 일시 (예: 2026-12-01 14:00 ~ 16:00)' 

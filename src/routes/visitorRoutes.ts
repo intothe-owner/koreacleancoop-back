@@ -3,6 +3,7 @@ import { Router, Request, Response } from 'express';
 import { Op } from 'sequelize';
 import { VisitorLog } from '../models/VisitorLog';
 import { sequelize } from '../config/database';
+import { checkLevel } from '../middlewares/authMiddleware';
 
 const router = Router();
 
@@ -93,5 +94,23 @@ router.get('/stats/time', async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: '서버 오류' });
   }
 });
+router.get('/today', checkLevel, async (req, res) => {
+  try {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
 
+    const count = await VisitorLog.count({
+      where: {
+        createdAt: {
+          [Op.gte]: startOfToday
+        }
+      }
+    });
+    
+    res.json({ count });
+  } catch (error) {
+    console.error('일일 방문자 카운트 에러:', error);
+    res.status(500).json({ message: '서버 에러가 발생했습니다.' });
+  }
+});
 export default router;

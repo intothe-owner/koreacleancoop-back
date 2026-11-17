@@ -381,4 +381,31 @@ router.post('/:id/assign', async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: '수동 배정 중 서버 오류' });
   }
 });
+
+// 1. 총 견적문의 수 조회 (GET /api/quotes/count)
+router.get('/count', checkLevel, async (req, res) => {
+  try {
+    const count = await QuoteRequest.count();
+    res.json({ count });
+  } catch (error) {
+    console.error('견적문의 카운트 에러:', error);
+    res.status(500).json({ message: '서버 에러가 발생했습니다.' });
+  }
+});
+
+// 2. 최근 견적문의 목록 조회 (GET /api/quotes/recent)
+router.get('/recent', checkLevel, async (req, res) => {
+  try {
+    const recentQuotes = await QuoteRequest.findAll({
+      order: [['createdAt', 'DESC']], // 최신순 정렬
+      limit: 5,                       // 5개 제한
+      attributes: ['_id', 'clientName', 'company', 'service', 'status', 'createdAt'] // 필요한 컬럼만 선택 (기본키가 id라면 '_id' 대신 'id'로 변경 필요)
+    }); 
+      
+    res.json({ data: recentQuotes });
+  } catch (error) {
+    console.error('최근 견적문의 조회 에러:', error);
+    res.status(500).json({ message: '서버 에러가 발생했습니다.' });
+  }
+});
 export default router;

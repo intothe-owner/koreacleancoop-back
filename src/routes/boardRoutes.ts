@@ -561,4 +561,14 @@ router.get('/:boardId/latest-category-posts', async (req: Request, res: Response
     res.status(500).json({ success: false, message: '서버 오류' });
   }
 });
+
+router.get('/posts/count', checkLevel, async (req, res) => {
+  try {
+    const count = await Post.count();
+    res.json({ count });
+  } catch (error) {
+    console.error('게시글 수 카운트 에러:', error);
+    res.status(500).json({ message: '서버 에러가 발생했습니다.' });
+  }
+});
 export default router; 

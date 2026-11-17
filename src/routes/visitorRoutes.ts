@@ -94,8 +94,10 @@ router.get('/stats/time', async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: '서버 오류' });
   }
 });
-router.get('/today', checkLevel, async (req, res) => {
+router.get('/today', checkLevel, async (req: Request, res: Response) => {
   try {
+    if (req.user?.level < 5) return res.status(403).json({ message: '접근 권한이 없습니다.' });
+
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
 

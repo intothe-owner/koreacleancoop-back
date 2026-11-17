@@ -382,9 +382,14 @@ router.post('/:id/assign', async (req: Request, res: Response) => {
   }
 });
 
-// 1. 총 견적문의 수 조회 (GET /api/quotes/count)
-router.get('/count', checkLevel, async (req, res) => {
+// 1. 총 견적문의 수 조회
+router.get('/count', checkLevel, async (req: Request, res: Response) => {
   try {
+    // 권한 체크 (선택 사항: 레벨 1(비회원)은 접근 불가 등)
+    if (req.user?.level < 5) {
+      return res.status(403).json({ message: '접근 권한이 없습니다.' });
+    }
+
     const count = await QuoteRequest.count();
     res.json({ count });
   } catch (error) {
@@ -393,13 +398,19 @@ router.get('/count', checkLevel, async (req, res) => {
   }
 });
 
-// 2. 최근 견적문의 목록 조회 (GET /api/quotes/recent)
-router.get('/recent', checkLevel, async (req, res) => {
+// 2. 최근 견적문의 목록 조회
+router.get('/recent', checkLevel, async (req: Request, res: Response) => {
   try {
+    if (req.user?.level < 5) {
+      return res.status(403).json({ message: '접근 권한이 없습니다.' });
+    }
+
     const recentQuotes = await QuoteRequest.findAll({
-      order: [['createdAt', 'DESC']], // 최신순 정렬
-      limit: 5,                       // 5개 제한
-      attributes: ['_id', 'clientName', 'company', 'service', 'status', 'createdAt'] // 필요한 컬럼만 선택 (기본키가 id라면 '_id' 대신 'id'로 변경 필요)
+      order: [['createdAt', 'DESC']],
+      limit: 5,
+      // 프론트엔드 인터페이스에 맞춰 필요한 속성만 가져옵니다. 
+      // id 컬럼은 프론트엔드에서 _id로 쓰고 있다면 별칭(alias)을 주거나 프론트 코드를 변경해야 합니다.
+      attributes: ['id', 'clientName', 'company', 'service', 'status', 'createdAt'] 
     }); 
       
     res.json({ data: recentQuotes });

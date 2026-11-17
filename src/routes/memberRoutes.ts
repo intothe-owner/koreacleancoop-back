@@ -201,11 +201,14 @@ router.patch('/:id/approve', checkLevel, async (req: Request, res: Response) => 
     res.status(500).json({ success: false, message: '서버 오류' });
   }
 });
-router.get('/count', checkLevel, async (req, res) => {
+router.get('/count', checkLevel, async (req: Request, res: Response) => {
   try {
+    if (req.user?.level < 5) return res.status(403).json({ message: '접근 권한이 없습니다.' });
+
     const count = await Member.count();
     res.json({ count });
   } catch (error) {
+    console.error('회원 수 카운트 에러:', error);
     res.status(500).json({ message: '서버 에러가 발생했습니다.' });
   }
 });

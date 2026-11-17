@@ -562,8 +562,10 @@ router.get('/:boardId/latest-category-posts', async (req: Request, res: Response
   }
 });
 
-router.get('/posts/count', checkLevel, async (req, res) => {
+router.get('/posts/count', checkLevel, async (req: Request, res: Response) => {
   try {
+    if (req.user?.level < 5) return res.status(403).json({ message: '접근 권한이 없습니다.' });
+
     const count = await Post.count();
     res.json({ count });
   } catch (error) {

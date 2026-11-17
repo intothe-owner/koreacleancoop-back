@@ -67,7 +67,17 @@ const findBoardConfig = async (param: string) => {
     }
   });
 };
+router.get('/posts/count', checkLevel, async (req: Request, res: Response) => {
+  try {
+    if (req.user?.level < 5) return res.status(403).json({ message: '접근 권한이 없습니다.' });
 
+    const count = await Post.count();
+    res.json({ count });
+  } catch (error) {
+    console.error('게시글 수 카운트 에러:', error);
+    res.status(500).json({ message: '서버 에러가 발생했습니다.' });
+  }
+});
 router.get('/captcha', (req: Request, res: Response) => {
   // 1. SVG 캡차 이미지 생성
   const captcha = svgCaptcha.create({
@@ -562,15 +572,5 @@ router.get('/:boardId/latest-category-posts', async (req: Request, res: Response
   }
 });
 
-router.get('/posts/count', checkLevel, async (req: Request, res: Response) => {
-  try {
-    if (req.user?.level < 5) return res.status(403).json({ message: '접근 권한이 없습니다.' });
 
-    const count = await Post.count();
-    res.json({ count });
-  } catch (error) {
-    console.error('게시글 수 카운트 에러:', error);
-    res.status(500).json({ message: '서버 에러가 발생했습니다.' });
-  }
-});
 export default router; 

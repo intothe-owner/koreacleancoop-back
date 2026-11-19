@@ -27,6 +27,7 @@ import mypageRoutes from './routes/mypageRoutes';
 import reportRoutes from './routes/reportRoutes';
 import eduScheduleRoutes from './routes/eduScheduleRoutes'; // 🌟 신규 라우터 추가
 import eduApplicationRoutes from './routes/eduApplicationRoutes';
+import kidisswRoutes from './routes/kdisswRoute';
 import path from 'path';
 
 dotenv.config();
@@ -94,6 +95,7 @@ app.use('/api/mypage', mypageRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/edu-schedules', eduScheduleRoutes); // 🌟 신규 라우터 연결
 app.use('/api/edu-applications', eduApplicationRoutes);
+app.use('/api/kdissw', kidisswRoutes);
 
 const syncOptions = process.env.NODE_ENV === 'production' ? {} : { alter: true };
 

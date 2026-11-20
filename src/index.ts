@@ -28,6 +28,8 @@ import reportRoutes from './routes/reportRoutes';
 import eduScheduleRoutes from './routes/eduScheduleRoutes'; // 🌟 신규 라우터 추가
 import eduApplicationRoutes from './routes/eduApplicationRoutes';
 import kidisswRoutes from './routes/kdisswRoute';
+import kcpassRouter from './routes/kcpassRoutes';
+import sscfRoutes from './routes/sscfRoutes';
 import path from 'path';
 
 dotenv.config();
@@ -96,7 +98,8 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/edu-schedules', eduScheduleRoutes); // 🌟 신규 라우터 연결
 app.use('/api/edu-applications', eduApplicationRoutes);
 app.use('/api/kdissw', kidisswRoutes);
-
+app.use('/api/kcpass', kcpassRouter);
+app.use('/api/sscf', sscfRoutes);
 const syncOptions = process.env.NODE_ENV === 'production' ? {} : { alter: true };
 
 // DB 동기화 및 서버 실행 (app.listen 대신 server.listen 사용)

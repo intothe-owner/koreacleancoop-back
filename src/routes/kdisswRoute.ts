@@ -14,6 +14,7 @@ export interface NoticeItem {
 }
 
 export interface PaginationInfo {
+  totalCount: number;
   currentPage: number;
   totalPages: number;
   pages: number[];
@@ -28,41 +29,39 @@ interface ScrapeResult {
 
 const cache = new Map<number, { data: ScrapeResult; expiresAt: number }>();
 
-function parsePagination($: cheerio.CheerioAPI, currentPage: number): PaginationInfo {
-  const pageSet = new Set<number>([currentPage]);
-  let maxPage = currentPage;
+function parsePagination($: cheerio.CheerioAPI, requestedPage: number): PaginationInfo {
+  // 상단 "전체 296건 / 현재 페이지 1/30" 파싱
+  const totalCountText = $('.page_info .total_page b').text().replace(/[^0-9]/g, '');
+  const currentPageText = $('.page_info .current_page strong').text().replace(/[^0-9]/g, '');
+  const totalPagesText = $('.page_info .current_page b').text().replace(/[^0-9]/g, '');
 
-  // 1. 페이징 영역의 링크에서 nPage 파라미터 추출 (끝페이지/다음페이지 포함)
-  $('a[href*="nPage="]').each((_, el) => {
-    const href = $(el).attr('href') ?? '';
-    const match = href.match(/nPage=(\d+)/);
-    if (match) {
-      const num = Number(match[1]);
-      if (num > maxPage) maxPage = num;
+  const totalCount = Number(totalCountText) || 0;
+  const currentPage = Number(currentPageText) || requestedPage;
+  let totalPages = Number(totalPagesText) || 1;
 
-      // 숫자 버튼만 pages 배열에 추가 ("다음", "끝" 같은 텍스트 버튼 제외)
-      if (/^\d+$/.test($(el).text().trim())) {
-        pageSet.add(num);
-      }
+  // 하단 페이징 블록 숫자 추출 (a.pageNow, a.pageNone)
+  const pages: number[] = [];
+  $('.board_pager a.pageNow, .board_pager a.pageNone').each((_, el) => {
+    const num = Number($(el).text().trim());
+    if (!Number.isNaN(num) && num > 0) {
+      pages.push(num);
     }
   });
 
-  // 2. 혹시 본문 상단에 "1 / 15 페이지" 같은 표기가 있으면 totalPages 보정
-  const bodyText = $('body').text();
-  const pageRatioMatch = bodyText.match(/(\d+)\s*\/\s*(\d+)\s*페이지/);
-  if (pageRatioMatch) {
-    const totalFromText = Number(pageRatioMatch[2]);
-    if (totalFromText > maxPage) maxPage = totalFromText;
+  // totalPages가 비어있을 경우 마지막 페이지 버튼(a.pageLast)에서 보정
+  if (totalPages <= 1) {
+    const lastHref = $('.board_pager a.pageLast').attr('href') ?? '';
+    const match = lastHref.match(/nPage=(\d+)/);
+    if (match) totalPages = Number(match[1]);
   }
 
-  const pages = Array.from(pageSet).sort((a, b) => a - b);
-
   return {
+    totalCount,
     currentPage,
-    totalPages: maxPage,
+    totalPages,
     pages,
     hasPrev: currentPage > 1,
-    hasNext: currentPage < maxPage,
+    hasNext: currentPage < totalPages,
   };
 }
 
@@ -82,19 +81,21 @@ async function scrapeNotices(page: number): Promise<ScrapeResult> {
   const $ = cheerio.load(html);
   const items: NoticeItem[] = [];
 
-  $('table tbody tr').each((_, row) => {
-    const $row = $(row);
-    const $link = $row.find('a').first();
+  // 실제 목록 컨테이너: #listView > ul
+  $('#listView > ul').each((_, ul) => {
+    const $ul = $(ul);
+    const $link = $ul.find('li.title a').first();
+
     const title = $link.text().trim();
     const href = $link.attr('href')?.trim() ?? '';
-
     if (!title || !href) return;
 
+    // 등록일: <li class="W13 m-br"><span class="sr-only">등록일</span>2026/10/30</li>
     let date = '';
-    $row.find('td').each((__, td) => {
-      const text = $(td).text().trim();
-      if (/^\d{4}[-.]\d{2}[-.]\d{2}$/.test(text)) {
-        date = text;
+    $ul.find('li').each((__, li) => {
+      const match = $(li).text().match(/\d{4}\/\d{2}\/\d{2}/);
+      if (match) {
+        date = match[0]; // "2026-10-30" 형태로 원하면 match[0].replace(/\//g, '-')
       }
     });
 
